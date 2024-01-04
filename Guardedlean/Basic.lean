@@ -6,6 +6,8 @@ axiom Later : (α : Type u) → Type u
 
 axiom delay : {α : Type u} → α → Later α
 
+axiom app : {α β : Type u} → Later (β → α) → Later β → Later α
+
 axiom Fix : (f : Type u → Type u) → Type u
 
 axiom Fix_beta : (f : Type u → Type u) → Fix f = f (Later (Fix f))
@@ -36,3 +38,8 @@ noncomputable def zeros : Str Nat := fix (fun x => .cons 0 x)
 theorem zeros_unfold : zeros = .cons 0 (delay zeros) := by
   simp [zeros]
   conv => lhs ; rw [fix_beta]
+
+def map {α β : Type u} (f : α → β) : Str α → Str β :=
+  fix.{u} fun r => fun xs =>
+    let x' := Str.head.{u} xs
+    .cons _ _ --(app.{u} xs.tail _)
