@@ -1,11 +1,24 @@
 import Std
 
+universe u
 
 axiom Later : (α : Type) → Type
 
-axiom delay : {α : Type} → α → Later α
+inductive DSubst (β : Type u) : Type (u+1) where
+  | empty : β → DSubst β
+  | cons : Later α → (α → DSubst β) → DSubst β
 
-axiom app : {α β : Type} → Later (β → α) → Later β → Later α
+
+axiom next : {α : Type} → DSubst α → Later α
+
+noncomputable def dmap (f : α → β) (x : Later α) : Later β
+  := next (.cons x fun x' => .empty (f x'))
+
+noncomputable def next' (x : α) : Later α
+  := next (.empty x)
+
+noncomputable def app (f : Later (α → β)) (x : Later α) : Later β
+  := next (.cons f fun f' => .cons x fun x' => .empty (f' x'))
 
 infixl:65   " <*> " => app
 
@@ -29,11 +42,11 @@ def Str.cons {α : Type} (x : α ) (xs : Later (Str α )) : Str α :=
 
 infixr:65   " :: " => Str.cons
 
-axiom fix_beta : {α : Type} → {f : Later α → α} → fix f = f (delay (fix f ))
+axiom fix_beta : {α : Type} → {f : Later α → α} → fix f = f (next' (fix f ))
 
 noncomputable def zeros : Str Nat := fix (fun x => 0 :: x)
 
-theorem zeros_unfold : zeros = .cons 0 (delay zeros) := by
+theorem zeros_unfold : zeros = .cons 0 (next' zeros) := by
   simp [zeros]
   conv => lhs ; rw [fix_beta]
 

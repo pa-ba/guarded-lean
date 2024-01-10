@@ -1,3 +1,3 @@
 import «Guardedlean»
 
-def main : IO Unit := ()
+def main : IO Unit := pure ()
