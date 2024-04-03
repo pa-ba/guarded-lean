@@ -29,12 +29,13 @@ def ToTType.restrmap (h : m ≤ n) (a : F A n) : F A m
      restrmaphelp m n_minus_m (cast q a)
 
 def ToTType.restrmapEq (p : m+1 ≤ n) (a : F A n) : A.restr m (restrmap p a) = restrmap (by omega) a
- := let k := n-(m+1)
+ := let k := n-(m+1);
+    have q : n = (m+1) + k := by omega
      by
       induction k with
-      | zero => have q : n = (m+1) := by sorry
-                have r : (LThelp n (m+1) p).val = 0 := by sorry
-                simp[restrmap,restrmaphelp,r]
+      | zero => have r : n = m+1 := by sorry
+                have s : (LThelp n (m+1) p).val = 0 := by sorry
+                simp[restrmap,restrmaphelp,s]
                 sorry
       | succ m p => sorry
 
