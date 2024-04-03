@@ -1,6 +1,5 @@
 -- This module serves as the root of the `ToT` library.
 -- Import modules here that should be built as part of the library.
-import «ToT».Basic
 import Lean
 
 structure ToTType where
@@ -169,6 +168,10 @@ def ToTType.unitFinal : A ⤳ Unit where
 def ToTType.cutF (A : ToTType) (n : Nat) : Nat → Type :=
   fun m => PProd (m ≤ n) (A.F m)
 
+def cutincl {A : ToTType} (a : A.F n) : (ToTType.cutF A n n) :=
+ let p : (n ≤ n) := by omega
+ ⟨p, a⟩
+
 def ToTType.cut (A : ToTType) (n : Nat) : ToTType where
   F := cutF A n
   restr := fun m =>
@@ -216,12 +219,16 @@ def ToTType.ev : Prod (Fun A B) A ⤳ B where
   property := by
     intro n
     intro x
-    have xfun := x.fst
-    have xa := x.snd
-    have q : x = (xfun,xa) := by sorry
-    simp[Prod, Fun,comp,cutRestr]
-    let r := xfun.property n _ --(by sorry, xa)
-    apply?
+--    have xfun := x.fst
+    have xa := cutincl x.snd
+--    have q : x = (xfun,xa) := by sorry
+    simp[Prod,Fun,comp,cutRestr]
+--    let xsnd : (cut A (n + 1)).F (n + 1) := cutincl x.snd
+    --let z :
+    let r := x.fst.property n xa --(by sorry, xa)
+    --let p : xa = ⟨_, x.fst⟩ := by omega
+--    exact r
+    --apply?
     sorry
 
 def ToTType.lamF (f : Prod A B ⤳ C) (n : Nat) (a : F A n) : cut B n ⤳ C where
@@ -233,20 +240,20 @@ def ToTType.lamF (f : Prod A B ⤳ C) (n : Nat) (a : F A n) : cut B n ⤳ C wher
     else
       let e : False := h (b.fst)
       by contradiction
-  property := by -- what is unsolved here?
-      intro m x
+  property := by
+      intro m b
       simp
       by_cases h : (m+1 ≤ n)
-      have k : m ≤ n := by omega
-      simp[h,k]
+      . have k : m ≤ n := by omega
+        simp[h,k]
+        let y := f.property m (restrmap h a,b.snd)
+        -- y almost has the right type here. How do I apply it?
       -- apply f.property m (restrmap h a,x.snd)
 --      simp[restrmap n (m+1) h a]
       --exact f.property m (restrmap h a,x.snd)
-      sorry
-      simp[h]
-      by_cases k : (m ≤ n)
-      simp[k]
-      have p : (m=m) := by omega
+        sorry
+      . let e : False := h (b.fst)
+        contradiction
 
 
 def ToTType.lam (f : Prod A B ⤳ C) : A ⤳ Fun B C where
@@ -255,8 +262,12 @@ def ToTType.lam (f : Prod A B ⤳ C) : A ⤳ Fun B C where
    intro n x
    simp[lamF]
    -- funext
-   apply?
+   --apply?
    sorry
+
+
+def ToTType.deltaFun {A B : Type} (f : A → B) : Γ ⤳ Fun A B :=
+  lam (comp snd (delta f))
 
 def ToTType.funcomp : Prod (Fun A B) (Fun B C) ⤳ Fun A C
   := let firststep : Prod (Prod (Fun A B) (Fun B C)) A ⤳ B
@@ -292,12 +303,13 @@ def fixp {Γ A : ToTType} (f : ToTType.Prod Γ (▷A) ⤳ A) : Γ ⤳ A where
     induction n with
     | zero => simp[fixpval]
               apply f.property
-    | succ m p => simp[fixpval,f.property,ToTType.Prod,Later,p]
-                  simp[fixprop f m (Γ.restr (m+1) γ)]
+    | succ m p => simp[fixpval,f.property,ToTType.Prod,ToTType.Later]
+                  sorry
+                  -- simp[fixprop f m (Γ.restr (m+1) γ)]
 -- What is the problem with Later here? ToTType.Later does not help
 
 def fixpoint (A : ToTType) (f : (▷A) ⤳ A) : (Unit ⤳ A)
-  := let g : ToTType.Prod Unit (▷A) ⤳ A := ToTType.comp (ToTType.snd Unit (▷A)) f;
+  := let g : ToTType.Prod Unit (▷A) ⤳ A := ToTType.comp ToTType.snd f;
      fixp g
 
 -- Show fixpoint is fixed point
@@ -379,34 +391,58 @@ def zeros : Unit ⤳ ToTType.Str Nat := fixpoint (ToTType.Str Nat) (ToTType.Str.
 declare_syntax_cat ToTExpr
 syntax "[" term "]" : ToTExpr
 syntax "fix" "(" ident ":" term ")" "=>" ToTExpr : ToTExpr
+syntax "fun" "(" ident ":" term ")" "=>" ToTExpr : ToTExpr
+syntax ToTExpr ToTExpr : ToTExpr
 syntax ident : ToTExpr
 syntax ToTExpr "::" ToTExpr : ToTExpr
+syntax "(" ToTExpr ")" : ToTExpr
 syntax "box(" ToTExpr ")" : term
 
 open Lean Elab Term
-partial def elabToTExpr (stx : TSyntax `ToTExpr ) : TermElabM (TSyntax `term) :=
+def lookup (vars : Nat) (index : Nat) : TermElabM (TSyntax `term) :=
+  match vars, index with
+  | 0, _ => throwError "No variables in scope"
+  | k+1, 0 => `(ToTType.snd)
+  | k+1, n+1 => do
+    let inner ← lookup k n
+    `(ToTType.comp ToTType.fst $inner)
+
+partial def elabToTExpr (vars : Nat) (levels : NameMap Nat) (stx : TSyntax `ToTExpr ) : TermElabM (TSyntax `term) :=
   match stx with
   | `(ToTExpr|[$t]) => `(ToTType.const $t)
   | `(ToTExpr|fix ($x : $A) => $body) => do
-    let bodyExpr <- elabToTExpr body
-    `(fixpoint $A $bodyExpr)
-  | `(ToTExpr|$x:ident) => `(ToTType.id _)
+    let bodyExpr <- elabToTExpr (vars +1) (levels.insert x.getId vars) body
+    `(fixp $bodyExpr)
+  | `(ToTExpr|fun ($x : $A) => $body) => do
+    let bodyExpr <- elabToTExpr (vars +1) (levels.insert x.getId vars) body
+    `(ToTType.lam $bodyExpr)
+  | `(ToTExpr|$e1 $e2) => do
+    let f <- elabToTExpr vars levels e1
+    let a <- elabToTExpr vars levels e2
+    `(ToTType.comp (ToTType.pair $f $a) ToTType.ev)
+  | `(ToTExpr|$x:ident) => do
+    if let some n := levels.find? x.getId then lookup vars (vars-n-1)
+     else throwErrorAt x "Not a ToT variable"
   | `(ToTExpr|$h :: $t) => do
-    let hd <- elabToTExpr h
-    let tl <- elabToTExpr t
+    let hd <- elabToTExpr vars levels h
+    let tl <- elabToTExpr vars levels t
     `(ToTType.Str.cons $hd $tl)
+  | `( ToTExpr|($t)) => elabToTExpr vars levels t
   | _ => throwErrorAt stx "Did not understand"
 
 elab_rules : term
   | `( box($t) ) => do
-    let f <- elabToTExpr t
+    let f <- elabToTExpr 0 {} t
     elabTerm f none
 
 #eval (box([4+3]) : Unit ⤳ Nat).val 0 ()
 
 def pretty_zeros : Unit ⤳ ToTType.Str Nat := box(fix (tl : _) => [0]::tl)
+def pretty_from : Unit ⤳ ToTType.Fun Nat (ToTType.Str Nat) :=
+--   box(fun (n : _) => fix (f : _) => n ::(f ([ToTType.deltaFun (Nat.succ)] n)))
+   box(fun (n : _) => fix (f : _) => n ::(f n))
 
-
+--#eval ToTType.Str.take pretty_zeros 8
 
 def Box (A : ToTType) : Type := Unit ⤳ A
 
@@ -427,9 +463,9 @@ def ToTType.Str.take (s : Scream A) : Nat → List A
   | 0 => []
   | n+1 => cihead s :: Str.take (citail s) n
 
-def ToTType.Str.map {A B : Type} (f : A → B) : (Str A) ⤳ (Str B) :=
+def ToTType.Str.map {A B : Type} (f : A ⤳ B) : (Str A) ⤳ (Str B) :=
   let appf : (Str A) ⤳ B
-    := comp head (delta f);
+    := comp head f;
   let hdout : (ToTType.Prod (▷(Fun (Str A) (Str B))) (Str A)) ⤳ B
     := comp snd appf;
   let dgrass : (ToTType.Prod (▷(Fun (Str A) (Str B))) (Str A)) ⤳ ▷(Fun (Str A) (Str B))
@@ -470,6 +506,6 @@ def ToTType.Str.natseq : Box (Str Nat) := comp (delta (fun _ => 0)) Str.from
 #eval ToTType.Str.take (ToTType.Str.natseq) 8
 
 --#eval ToTType.Str.take zeros 8
---#eval ToTType.Str.take pretty_zeros 8
+#eval ToTType.Str.take pretty_zeros 8
 
 --#check Nat ⤳ Nat
