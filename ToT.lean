@@ -303,10 +303,12 @@ def fixp {Γ A : ToTType} (f : ToTType.Prod Γ (▷A) ⤳ A) : Γ ⤳ A where
     induction n with
     | zero => simp[fixpval]
               apply f.property
-    | succ m p => simp[fixpval,f.property,ToTType.Prod,ToTType.Later]
-                  sorry
-                  -- simp[fixprop f m (Γ.restr (m+1) γ)]
--- What is the problem with Later here? ToTType.Later does not help
+    | succ m p => simp[fixpval,f.property,fixprop,ToTType.Prod]
+                  simp[ToTType.Later]
+                  --let q := p (Γ.restr (m + 1) γ)
+                  exact
+                    congrArg (f.val (Nat.succ m))
+                      (congrArg (Prod.mk (Γ.restr (Nat.succ m) γ)) (p (Γ.restr (m + 1) γ)))
 
 def fixpoint (A : ToTType) (f : (▷A) ⤳ A) : (Unit ⤳ A)
   := let g : ToTType.Prod Unit (▷A) ⤳ A := ToTType.comp ToTType.snd f;
