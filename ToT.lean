@@ -8,7 +8,10 @@ structure ToTType where
 
 def ToTType.restrmaphelp (n : Nat) : (k : Nat) → F A (n + k) → F A n
   | 0, a => a
-  | h+1 , a => restrmaphelp n h (A.restr (n+h) a)
+  | h+1 , a =>
+            let p : (n + (h + 1)) = (n + 1 + h) := by omega
+            A.restr n (restrmaphelp (n+1) h (p ▸ a))
+--  | h+1 , a => restrmaphelp n h (A.restr (n+h) a)
 
 def LThelp (n m : Nat) (h : m ≤ n) : {k : Nat // m+k = n} where
   val := n-m
@@ -27,6 +30,7 @@ def ToTType.restrmap (h : m ≤ n) (a : F A n) : F A m
   := let ⟨ n_minus_m, p⟩ := LThelp n m h;
      let q : F A n = F A (m + n_minus_m) := by rw[p];
      restrmaphelp m n_minus_m (cast q a)
+
 
 def ToTType.restrmapEq (p : m+1 ≤ n) (a : F A n) : A.restr m (restrmap p a) = restrmap (by omega) a
  := let k := n-(m+1);
