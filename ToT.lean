@@ -220,23 +220,28 @@ def ToTType.Fun (A B : ToTType) : ToTType where
 
 def ToTType.ev : Prod (Fun A B) A ⤳ B where
   val := fun n => fun fa =>
-    let a := (Prod.snd fa)
     let f := (Prod.fst fa).val n
-    f ⟨by simp , a⟩
+    let a := (Prod.snd fa)
+    let xa := cutincl a
+    f xa
   property := by
     intro n
-    intro x
+    intro fa
+    dsimp
 --    have xfun := x.fst
-    have xa := cutincl x.snd
+--    have xa := cutincl fa.snd
 --    have q : x = (xfun,xa) := by sorry
-    simp[Prod,Fun,comp,cutRestr]
+    simp[Prod,Fun,comp,cutRestr,cutincl]
 --    let xsnd : (cut A (n + 1)).F (n + 1) := cutincl x.snd
     --let z :
-    let r := x.fst.property n xa --(by sorry, xa)
+--    let a := (Prod.snd fa)
+    let r := fa.fst.property n (cutincl fa.snd) --(by sorry, xa)
     --let p : xa = ⟨_, x.fst⟩ := by omega
 --    exact r
     --apply?
-    sorry
+    simp[cutincl] at r
+    rw[r]
+    simp[cut]
 
 def ToTType.lamF (f : Prod A B ⤳ C) (n : Nat) (a : F A n) : cut B n ⤳ C where
   val := fun m b =>
@@ -254,6 +259,10 @@ def ToTType.lamF (f : Prod A B ⤳ C) (n : Nat) (a : F A n) : cut B n ⤳ C wher
       . have k : m ≤ n := by omega
         simp[h,k]
         let y := f.property m (restrmap h a,b.snd)
+        rw[y]
+        cases b
+        simp[Prod,cut,h,k,restrmap]
+
         -- y almost has the right type here. How do I apply it?
       -- apply f.property m (restrmap h a,x.snd)
 --      simp[restrmap n (m+1) h a]
