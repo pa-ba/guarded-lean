@@ -13,6 +13,16 @@ def ToTType.restrmaphelp (n : Nat) : (k : Nat) → F A (n + k) → F A n
             A.restr n (restrmaphelp (n+1) h (p ▸ a))
 --  | h+1 , a => restrmaphelp n h (A.restr (n+h) a)
 
+def restrmaphelpzero (n k : Nat) (p : k = 0) (q : n+k = n) (x : ToTType.F A (n+k)): ToTType.restrmaphelp n k x = q ▸ x
+  := by
+      cases p
+      simp[ToTType.restrmaphelp]
+
+def restrmaphelpsucc (n k : Nat) (p : k = (k'+1)) (q : _= n+ 1+k') (x : ToTType.F A (n+k)) :
+        ToTType.restrmaphelp n k x = A.restr n (ToTType.restrmaphelp (n+1) k' (q ▸ x)) := by
+  cases p
+  simp[ToTType.restrmaphelp]
+
 def LThelp (n m : Nat) (h : m ≤ n) : {k : Nat // m+k = n} where
   val := n-m
   property := by
@@ -21,6 +31,17 @@ def LThelp (n m : Nat) (h : m ≤ n) : {k : Nat // m+k = n} where
      -- Found using apply?
      -- by omega tactic
 
+def LThelpZero (m n : Nat) (p : m+1=n) (q : m+1 ≤ n) : (LThelp n (m+1) q).val = 0
+  := by
+      have : n-(m+1) = 0 := by omega
+      unfold LThelp
+      simp[this]
+
+def LThelpVal (m n : Nat) (p : m ≤ n) : (LThelp n m p).val = n - m
+  := by
+      unfold LThelp
+      simp
+
 def ToTType.testr (n m : Nat) (p : n=m) (a : F A n) : F A m
   := p ▸ a
   -- let q : F A n = F A m := by rw[p];
@@ -28,20 +49,110 @@ def ToTType.testr (n m : Nat) (p : n=m) (a : F A n) : F A m
 
 def ToTType.restrmap (h : m ≤ n) (a : F A n) : F A m
   := let ⟨ n_minus_m, p⟩ := LThelp n m h;
-     let q : F A n = F A (m + n_minus_m) := by rw[p];
-     restrmaphelp m n_minus_m (cast q a)
+     let q : n = (m + n_minus_m) := by rw[p];
+     restrmaphelp m n_minus_m (q ▸ a)
+
+def specialK (A : α → Sort u) (e : A x) (p : x=y) (p' : x = y') (q : y = z) (q' : y'=z)  : q ▸ (p ▸ e) = q' ▸ (p' ▸ e)
+  := by
+      cases p
+      cases q
+      cases p'
+      cases q'
+      rfl
+
+def tonyBlairEq (p : A = B) (q : @HEq A x B y) : x = p ▸ y :=
+    by
+     cases p
+     simp
+     cases q
+     rfl
+
+def noJ (A : α → Sort u) (p : x = y) (q : x = y) (a : A x) : p ▸ a = q ▸ a := by
+  cases p; cases q; rfl
+
+theorem foo {A : α → Sort u} {p : b = a} {q : c = a} {r : d = c} {s : d = b} {x : A b} {y : A c} : p ▸ x = q ▸ y → x = s ▸ r ▸ y := by
+  cases p; cases q; cases r; simp
+
+def ToTType.restrmapEq (p : m+1 ≤ n) (q : m ≤ n) (a : F A n) : A.restr m (restrmap p a) = restrmap q a
+    := by
+       let d := LThelp n (m+1) p
+       let ⟨ k, klt⟩ := d
+       induction k with
+       | zero => simp[restrmap]
+                 rw[restrmaphelpzero]
+                 case p =>
+                   apply LThelpZero
+                   exact klt
+                 case q =>
+                   simp_arith
+                   apply LThelpZero
+                   exact klt
+                 rw[restrmaphelpsucc (k':=0)]
+                 case p =>
+                   rw[LThelpVal m n q]
+                   rw[← klt]
+                   simp
+                   omega
+                 case q =>
+                   rw[LThelpVal m n q]
+                   rw[← klt]
+                   simp
+                   omega
+                 rw[restrmaphelpzero]
+                 case p => rfl
+                 case q => rfl
+                 case zero =>
+                   simp
+                   apply congrArg
+                   apply specialK (A := A.F) (e := a)
+       | succ k' ih =>
+          simp[restrmap]
+          conv => lhs ; unfold restrmaphelp
+          have : (LThelp n (m + 1) p).val = k'+1 := by
+            simp[LThelp]
+            omega
+          split
+          . omega
+          . dsimp
+            rw[← restrmaphelpsucc]
+            simp[LThelp]
+            have h : n-m = k' +2 := by omega
+            conv => rhs ; rw[restrmaphelpsucc (p:=h) (q:= by omega)]
+            rename_i _ k'' _ _ _
+            have : k'' = k' := by omega
+            apply congrArg
+            cases this
+            apply congrArg
+            congr <;> try trivial
+            rename_i _ _ _ _ heq
+            have := tonyBlairEq ?r heq
+            case r =>
+              apply congrArg
+              omega
+            simp at this
+            have bar : m + (n - m) = m + 1 + (k' + 1) := by omega
+            apply foo () -- (y:=a) (r:=restrmap.proof_1 (LThelp n m _).val (LThelp n m _).property)
+            . omega
+            . apply Eq.symm
+
+            apply tonyBlairEq at heq
 
 
-def ToTType.restrmapEq (p : m+1 ≤ n) (a : F A n) : A.restr m (restrmap p a) = restrmap (by omega) a
- := let k := n-(m+1);
-    have q : n = (m+1) + k := by omega
-     by
-      induction k with
-      | zero => have r : n = m+1 := by sorry
-                have s : (LThelp n (m+1) p).val = 0 := by sorry
-                simp[restrmap,restrmaphelp,s]
-                sorry
-      | succ m p => sorry
+
+--  := let ⟨ k, klt⟩  := LThelp n (m+1) p;
+--     have q : n = (m+1) + k := by omega
+--      by
+--       induction k with
+--       | zero => have r : n = m+1 := by rw[klt]
+--                 have s : (LThelp n (m+1) p).val = 0 := by sorry
+--                 simp[restrmap,restrmaphelp,s]
+--                 unfold restrmaphelp
+--                 simp[s]
+--                 split
+--                 split
+--                 simp[*]
+--                 sorry
+--       | succ m p => sorry
 
 
 def ToTHom (A B : ToTType) : Type
