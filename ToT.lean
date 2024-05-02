@@ -60,7 +60,7 @@ def specialK (A : α → Sort u) (e : A x) (p : x=y) (p' : x = y') (q : y = z) (
       cases q'
       rfl
 
-def tonyBlairEq (p : A = B) (q : @HEq A x B y) : x = p ▸ y :=
+def tonyBlairEq {A : α → Sort u} {x : A a} {y : A b} (p : a = b) (q : @HEq (A a) x (A b) y) : x = p ▸ y :=
     by
      cases p
      simp
@@ -70,8 +70,10 @@ def tonyBlairEq (p : A = B) (q : @HEq A x B y) : x = p ▸ y :=
 def noJ (A : α → Sort u) (p : x = y) (q : x = y) (a : A x) : p ▸ a = q ▸ a := by
   cases p; cases q; rfl
 
-theorem foo {A : α → Sort u} {p : b = a} {q : c = a} {r : d = c} {s : d = b} {x : A b} {y : A c} : p ▸ x = q ▸ y → x = s ▸ r ▸ y := by
-  cases p; cases q; cases r; simp
+theorem foo {A : α → Sort u} {p : b = a} {q : c = a} {r : d = c} {s : d = b} {x : A b} {y : A c} : q ▸ y = p ▸ x → x = s ▸ r ▸ y := by
+  cases p; cases q; cases r; dsimp; apply Eq.symm
+
+set_option pp.proofs.withType true
 
 def ToTType.restrmapEq (p : m+1 ≤ n) (q : m ≤ n) (a : F A n) : A.restr m (restrmap p a) = restrmap q a
     := by
@@ -130,12 +132,10 @@ def ToTType.restrmapEq (p : m+1 ≤ n) (q : m ≤ n) (a : F A n) : A.restr m (re
               apply congrArg
               omega
             simp at this
-            have bar : m + (n - m) = m + 1 + (k' + 1) := by omega
-            apply foo () -- (y:=a) (r:=restrmap.proof_1 (LThelp n m _).val (LThelp n m _).property)
+            apply foo this -- (y:=a) (r:=restrmap.proof_1 (LThelp n m _).val (LThelp n m _).property)
             . omega
-            . apply Eq.symm
+            . rfl
 
-            apply tonyBlairEq at heq
 
 
 
