@@ -255,8 +255,7 @@ def ToTType.cutRestr {A : ToTType} {n : Nat} : (cut A n)⤳(cut A (n+1)) where
     fun ⟨_, y⟩ => ⟨by omega, y⟩
     else by
       intro h
-      simp [cut] at h
-      simp [cutF] at h
+      simp [cut, cutF] at h
       cases h
       contradiction
   property := by
@@ -317,17 +316,15 @@ def ToTType.lamF (f : Prod A B ⤳ C) (n : Nat) (a : F A n) : cut B n ⤳ C wher
       simp
       by_cases h : (m+1 ≤ n)
       . have k : m ≤ n := by omega
-        simp[h,k]
-        let y := f.property m (restrmap h a,b.snd)
+        simp [h, k]
+        let y := f.property m (restrmap h a, b.snd)
         rw[y]
-        cases b
-        simp[Prod,cut,h,k,restrmap]
-
-        -- y almost has the right type here. How do I apply it?
-      -- apply f.property m (restrmap h a,x.snd)
---      simp[restrmap n (m+1) h a]
-      --exact f.property m (restrmap h a,x.snd)
-        sorry
+        apply congrArg
+        simp [Prod]
+        constructor
+        . apply restrmapEq
+        . simp [cut]
+          split <;> cases b <;> simp
       . let e : False := h (b.fst)
         contradiction
 
@@ -336,7 +333,7 @@ def ToTType.lam (f : Prod A B ⤳ C) : A ⤳ Fun B C where
  val := lamF f
  property := by
    intro n x
-   simp[lamF]
+   simp [lamF]
    -- funext
    --apply?
    sorry
