@@ -18,6 +18,12 @@ theorem ToTType.cast_cast_trans {A : ToTType} {p : n = k} {q : k = j} {x : A.F n
   cases p
   rfl
 
+theorem Subtype.valEq : x = w -> Subtype.mk x y = Subtype.mk w z :=
+  by
+   intro h
+   cases h
+   rfl
+
 def ToTType.restrmaphelp (n : Nat) : (k : Nat) → F A (n + k) → F A n
   | 0, a => a
   | h+1 , a =>
@@ -102,6 +108,44 @@ def ToTType.restrmapEq
     simp at this
     apply this
 
+def ToTType.restrmaphelpEqInnerZero
+  (m n : Nat)
+  (A : ToTType)
+  (p : m ≤ n + 1)
+  (q : m ≤ n)
+  (a : A.F (n + 1))
+  (klt : m + 0 = n)
+  : restrmap p a = restrmap q (A.restr n a) := by
+    simp at klt
+    cases klt
+    simp[restrmap]
+    have := restrmaphelpzero (A := A) m (LThelp m m q).val ?e (by simp)
+    rw[this]
+    simp
+    have := restrmaphelpsucc (k':=0) m (A := A) 1 rfl rfl a
+    rw[restrmaphelpsucc (k':=0)] <;> try (simp_arith; omega)
+    rw[restrmaphelpzero ] <;> try (simp_arith; omega)
+    case q => rfl
+    all_goals (try simp[LThelp])
+    case q => omega
+    simp
+
+def ToTType.restrmapEqInner
+    (p : m ≤ n+1)
+    (q : m ≤ n)
+    (a : F A (n+1))
+    : restrmap p a = restrmap q (A.restr n a) := by
+      let ⟨ k, klt⟩ := LThelp n m q
+      induction k with
+      | zero =>
+        simp[restrmap]
+        simp at klt
+        cases klt
+        simp[LThelp]
+        have : m-m = 0 := by simp_arith
+        apply restrmaphelpEqInnerZero <;> omega
+      | succ k' =>
+        sorry
 
 
 def ToTHom (A B : ToTType) : Type
@@ -241,37 +285,18 @@ def cutincl {A : ToTType} (a : A.F n) : (ToTType.cutF A n n) :=
 
 def ToTType.cut (A : ToTType) (n : Nat) : ToTType where
   F := cutF A n
-  restr := fun m =>
-    if h : m+1 ≤ n then
-      fun ⟨_, y⟩ => ⟨by exact Nat.le_of_succ_le h, A.restr m y⟩
-    else by
-      intro a
-      simp [cutF] at a
-      cases a
-      contradiction
+  restr := fun m ⟨h, y⟩ =>
+   ⟨by exact Nat.le_of_succ_le h, A.restr m y⟩
 
 def ToTType.cutRestr {A : ToTType} {n : Nat} : (cut A n)⤳(cut A (n+1)) where
-  val := fun m => if h : m ≤ n then
-    fun ⟨_, y⟩ => ⟨by omega, y⟩
-    else by
-      intro h
-      simp [cut, cutF] at h
-      cases h
-      contradiction
+  val := fun m ⟨h, y⟩ =>
+    ⟨by omega, y⟩
   property := by
     intro p
     intro x
     simp
     split
-    . split
-      . simp
-        cases x
-        have : p+1≤ n+1 := by omega
-        simp [cut, *]
-      . omega
-    . cases x
-      contradiction
-
+    simp[cut]
 
 def ToTType.Fun (A B : ToTType) : ToTType where
   F := fun n => cut A n ⤳ B
@@ -304,39 +329,43 @@ def ToTType.ev : Prod (Fun A B) A ⤳ B where
 
 def ToTType.lamF (f : Prod A B ⤳ C) (n : Nat) (a : F A n) : cut B n ⤳ C where
   val := fun m b =>
-    if h : m ≤ n then
-      let bval : F B m := b.snd
-      let a_restr : F A m := restrmap h a
-      f.val m (a_restr, bval)
-    else
-      let e : False := h (b.fst)
-      by contradiction
+    let p : m ≤ n := b.fst
+    let bval : F B m := b.snd
+    let a_restr : F A m := restrmap p a
+    f.val m (a_restr, bval)
   property := by
       intro m b
       simp
-      by_cases h : (m+1 ≤ n)
-      . have k : m ≤ n := by omega
-        simp [h, k]
-        let y := f.property m (restrmap h a, b.snd)
-        rw[y]
-        apply congrArg
-        simp [Prod]
-        constructor
-        . apply restrmapEq
-        . simp [cut]
-          split <;> cases b <;> simp
-      . let e : False := h (b.fst)
-        contradiction
+      let h : (m+1 ≤ n) := b.fst
+      let y := f.property m (restrmap h a, b.snd)
+      rw[y]
+      apply congrArg
+      simp [Prod]
+      constructor
+      . apply restrmapEq
+      . simp [cut]
+        cases b
+        simp
 
 
 def ToTType.lam (f : Prod A B ⤳ C) : A ⤳ Fun B C where
  val := lamF f
  property := by
    intro n x
-   simp [lamF]
-   -- funext
-   --apply?
-   sorry
+   let ⟨fval, fprop⟩ := f
+   simp [lamF, Fun, comp]
+   apply Subtype.valEq
+   funext m b
+   simp[Prod] at fprop
+   simp[· ∘ ·]
+   apply congrArg
+   ext
+   . simp
+     sorry
+   . simp
+     simp[cutRestr]
+     cases b
+     simp
 
 
 def ToTType.deltaFun {A B : Type} (f : A → B) : Γ ⤳ Fun A B :=
