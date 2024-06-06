@@ -145,6 +145,7 @@ def ToTType.restrmapEqInner
         have : m-m = 0 := by simp_arith
         apply restrmaphelpEqInnerZero <;> omega
       | succ k' =>
+        simp[restrmap,LThelp]
         sorry
 
 
@@ -361,7 +362,7 @@ def ToTType.lam (f : Prod A B ⤳ C) : A ⤳ Fun B C where
    apply congrArg
    ext
    . simp
-     sorry
+     apply restrmapEqInner
    . simp
      simp[cutRestr]
      cases b
@@ -655,3 +656,92 @@ def ToTType.Str.natseq : Box (Str Nat) := comp (delta (fun _ => 0)) Str.from
 #eval ToTType.Str.take pretty_zeros 8
 
 --#check Nat ⤳ Nat
+
+-- Start of families part
+
+structure ToTType.Fam (Γ : ToTType) where
+  F : (n : Nat) → Γ.F (n) → Type
+  restr : {n : Nat} → {γ : Γ.F (n + 1)} → F (n+1) γ → F n (Γ.restr n γ)
+
+def ToTType.AsFam (A : ToTType) : Fam Γ where
+  F n _ := A.F n
+  restr {n} := A.restr n
+
+def ToTType.SubstHelp {A : Fam Γ} {f : Δ ⤳ Γ} {n : Nat} {δ : Δ.F (n+1)} (a : A.F n (Γ.restr n (f.val (n+1) δ)) ) : A.F n (f.val n (Δ.restr n δ)) :=
+  f.property n δ ▸ a
+
+def ToTType.Subst (A : Fam Γ) (f : Δ ⤳ Γ) : Fam Δ where
+  F n δ := A.F n (f.val n δ)
+  restr a := SubstHelp (A.restr a)
+
+def ToTType.Elem (Γ : ToTType) (A : Fam Γ) : Type
+    := {f : (n : Nat) → (γ : Γ.F n) → A.F n γ // (∀n γ, A.restr (f (n+1) γ)= f n (Γ.restr n γ))}
+
+def ToTType.AsElem (f : Γ ⤳ A) : Elem Γ (AsFam A) where
+   val n γ := f.val n γ
+   property := by
+     intro n γ
+     simp[AsFam]
+     exact f.property n γ
+
+def ToTType.Compr (A : Fam Γ) : ToTType where
+  F n := (γ : Γ.F n)× (A.F n γ)
+  restr n ga := let ⟨γ,a⟩ := ga;
+                let γ' := Γ.restr n γ;
+                let a' := A.restr a;
+                ⟨γ', a'⟩
+
+-- Maybe better to just do logic?
+
+def ToTType.ToTPred (Γ : ToTType) : Type
+  := {φ : {n : Nat} → (γ : Γ.F n) → Prop // ∀ n γ, φ γ → φ (Γ.restr n γ)}
+
+def ToTType.Sequent (φ ψ : ToTPred Γ) : Prop
+  := ∀ n (γ : Γ.F n), (φ.val γ) → (ψ.val γ)
+
+def ToTType.PredSubst (φ : ToTPred Γ) (σ : Δ ⤳ Γ) : ToTPred Δ where
+  val {n} δ := φ.val (σ.val n δ)
+  property := by
+    intro n γ
+    simp
+    have p := σ.property n γ
+    rw[← p]
+    exact φ.property n (σ.val (n + 1) γ)
+
+def ToTType.Conj (φ ψ : ToTPred Γ) : ToTPred Γ where
+  val γ := φ.val γ ∧ ψ.val γ
+  property := by
+    intro n γ
+    simp
+    intro  p q
+    constructor
+    . exact φ.property n γ p
+    . exact ψ.property n γ q
+
+def ToTType.ConjIntro (ρ φ ψ : ToTPred Γ) (p : Sequent ρ φ) (q : Sequent ρ ψ) : Sequent ρ (Conj φ ψ) :=
+  by
+    simp[Sequent]
+    intro n γ r
+    simp[Conj]
+    constructor
+    . exact p n γ r
+    . exact q n γ r
+
+def ToTType.ConjElimL (ρ φ ψ : ToTPred Γ) (p : Sequent ρ (Conj φ ψ)) : Sequent ρ φ :=
+  by
+    simp[Sequent]
+    intro n γ q
+    have r := p n γ q
+    let ⟨r1 , _ ⟩ :=  r
+    exact r1
+
+def ToTType.ConjElimR (ρ φ ψ : ToTPred Γ) (p : Sequent ρ (Conj φ ψ)) : Sequent ρ ψ :=
+  by
+    simp[Sequent]
+    intro n γ q
+    have r := p n γ q
+    let ⟨ _ , r2 ⟩ :=  r
+    exact r2
+
+def PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
+  ∀ n , φ (γ.val n)
