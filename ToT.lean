@@ -135,18 +135,32 @@ def ToTType.restrmapEqInner
     (q : m ≤ n)
     (a : F A (n+1))
     : restrmap p a = restrmap q (A.restr n a) := by
-      let ⟨ k, klt⟩ := LThelp n m q
-      induction k with
+      unfold restrmap
+      cases LThelp n m q with | mk k klt =>
+      cases LThelp (n+1) m p with | mk k'' klt' =>
+      /-simp[restrmap]
+      cases LThelp n m q with | mk k klt =>
+      cases LThelp (n+1) m p with | mk k' klt' =>
+      dsimp-/
+      dsimp
+      induction k generalizing m with
       | zero =>
-        simp[restrmap]
+        -- simp[restrmap]
         simp at klt
         cases klt
         simp[LThelp]
         have : m-m = 0 := by simp_arith
         apply restrmaphelpEqInnerZero <;> omega
-      | succ k' =>
-        simp[restrmap,LThelp]
+      | succ k' IH =>
+        dsimp[restrmaphelp]
+        have : k'' = k'+2 := by omega
+        subst this
+        dsimp[restrmaphelp]
+        apply congrArg
+        have := IH (m := m+1) (by omega) (by omega) (by omega)
+        simp_all
         sorry
+
 
 
 def ToTHom (A B : ToTType) : Type
@@ -743,5 +757,5 @@ def ToTType.ConjElimR (ρ φ ψ : ToTPred Γ) (p : Sequent ρ (Conj φ ψ)) : Se
     let ⟨ _ , r2 ⟩ :=  r
     exact r2
 
-def PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
-  ∀ n , φ (γ.val n)
+def ToTType.PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
+  ∀ n , φ.val (γ.val n ())
