@@ -146,11 +146,23 @@ def ToTType.restrmapEqInner
       induction k generalizing m with
       | zero =>
         -- simp[restrmap]
-        simp at klt
-        cases klt
-        simp[LThelp]
-        have : m-m = 0 := by simp_arith
-        apply restrmaphelpEqInnerZero <;> omega
+        sorry
+--        simp at klt
+--        cases klt
+--        simp[LThelp]
+--        have : m-m = 0 := by simp_arith
+/-
+type mismatch
+  PLaterProp
+has type
+  (◁?m.78805).ToTPred → {n : Nat} → ?m.78805.F n → Prop : Type
+but is expected to have type
+  Γ.F n✝ → Prop : Type
+the following variables have been introduced by the implicit lambda feature
+  n✝ : Nat
+you can disable implicit lambdas using `@` or writing a lambda expression with `{}` or `[]` binder annotations.
+-/
+--        apply restrmaphelpEqInnerZero <;> omega
       | succ k' IH =>
         dsimp[restrmaphelp]
         have : k'' = k'+2 := by omega
@@ -283,6 +295,9 @@ def ToTType.pair (f : C ⤳ A) (g : C ⤳ B) : (C ⤳ ToTType.Prod A B) where
                constructor
                case left => exact f.property n x
                case right => exact g.property n x
+
+def ToTType.ProdHom (f : A ⤳ C) (g : B ⤳ D) : (Prod A B) ⤳ (Prod C D) :=
+  pair (comp fst f) (comp snd g)
 
 def ToTType.unitFinal : A ⤳ Unit where
   val := fun _ _ => ()
@@ -713,6 +728,13 @@ def ToTType.ToTPred (Γ : ToTType) : Type
 def ToTType.Sequent (φ ψ : ToTPred Γ) : Prop
   := ∀ n (γ : Γ.F n), (φ.val γ) → (ψ.val γ)
 
+def ToTType.SeqComp (ρ φ ψ : ToTPred Γ) (p : Sequent ρ φ) (q : Sequent φ ψ) : Sequent ρ ψ :=
+  by
+   simp[Sequent]
+   intro n γ
+   intro a
+   exact (q n γ (p n γ a))
+
 def ToTType.PredSubst (φ : ToTPred Γ) (σ : Δ ⤳ Γ) : ToTPred Δ where
   val {n} δ := φ.val (σ.val n δ)
   property := by
@@ -757,5 +779,86 @@ def ToTType.ConjElimR (ρ φ ψ : ToTPred Γ) (p : Sequent ρ (Conj φ ψ)) : Se
     let ⟨ _ , r2 ⟩ :=  r
     exact r2
 
+def ToTType.True : ToTPred Γ where
+  val γ := true
+  property := by
+    intro n _
+    simp
+
+def ToTType.proofsOf (φ : Prop) : Type := { x : Unit // φ}
+
+def ToTType.proofsOfEl (φ : Prop) (p : φ) : (proofsOf φ) where
+  val := ()
+  property := p
+
+def ToTType.proofsOfImp (p : φ → ψ) (x : proofsOf φ) : (proofsOf ψ) where
+--  proofsOfEl ψ (p (x.property))
+  val := x.val
+  property := p x.property
+
+def ToTType.UnitSet (x y : Unit) : x=y :=
+  by
+   ext
+
+def ToTType.proofsOfSet (x y : proofsOf φ) : x = y :=
+  by
+   sorry
+
+def ToTType.Yoneda (n : Nat) : ToTType where
+  F {m} := proofsOf (m ≤ n)
+  restr m := proofsOfImp (by omega)
+
+def ToTType.YonMap (p : m ≤ n) : (Yoneda m) ⤳ (Yoneda n) where
+  val o q := proofsOfEl (o ≤ n) (by let r : (o ≤ m) := q.property ; omega)
+  property := by
+    intro n x
+    apply proofsOfSet
+
+-- PredPi Γ is the Π type Π Γ ToTProp
+def ToTType.PredPi (Γ : ToTType) : ToTType where
+  F n := ToTPred (Prod Γ (Yoneda n))
+  restr n φ :=
+    let f : (Prod Γ (Yoneda n)) ⤳ (Prod Γ (Yoneda (n+1))) := ProdHom ToTType.id (YonMap (by omega))
+    PredSubst φ f
+
+def ToTType.PredPiAbs (φ : ToTPred (Prod Δ Γ)) : Δ ⤳ (PredPi Γ) where
+  val n δ :=
+    let ψ := fun {m} p => φ.val ⟨restrmap p.snd.property δ, p.fst ⟩
+    let prop : ∀ (m : Nat) (ρ : (Prod Γ (Yoneda n)).F (m+1)) , ψ ρ → ψ ((Prod Γ (Yoneda n)).restr m ρ) :=
+      by
+       intro m ρ p
+       simp[ψ]
+       sorry
+    ⟨ ψ , prop ⟩
+  property := _
+
+def ToTType.PredPiApp (f : Δ ⤳ PredPi Γ) : ToTPred (Prod Δ Γ) where
+  val n {δγ} :=
+    let
+      δ : Δ.F n := δγ.fst -- Prod.fst δγ -- _ - fst δγ
+      --f.val n δ n
+      -- I dont understand why δ does not type check
+  property := _
+
+
 def ToTType.PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
-  ∀ n , φ.val (γ.val n ())
+  Sequent True φ
+
+def ToTType.PLaterProp (φ : ToTPred (◁ Γ)) : {n : Nat} → (γ : Γ.F n) → Prop
+  | 0, _ => true
+  | _+1, γ => φ.val γ
+
+def ToTType.PLater (φ : ToTPred (◁ Γ)) : ToTPred Γ where
+  val := PLaterProp φ
+  property := by
+    intro n
+    cases n
+    . simp[PLaterProp]
+    . simp[PLaterProp]
+      apply φ.property
+
+def ToTType.PEarlier (φ : ToTPred Γ) : ToTPred (◁ Γ) where
+  val := φ.val
+  property := by
+    intro n γ
+    apply (φ.property (n+1) γ)
