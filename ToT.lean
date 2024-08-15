@@ -814,31 +814,48 @@ def ToTType.YonMap (p : m ≤ n) : (Yoneda m) ⤳ (Yoneda n) where
     intro n x
     apply proofsOfSet
 
--- PredPi Γ is the Π type Π Γ ToTProp
-def ToTType.PredPi (Γ : ToTType) : ToTType where
-  F n := ToTPred (Prod Γ (Yoneda n))
+
+def ToTType.ToTProp : ToTType where
+  F n := ToTPred (Yoneda n)
   restr n φ :=
-    let f : (Prod Γ (Yoneda n)) ⤳ (Prod Γ (Yoneda (n+1))) := ProdHom ToTType.id (YonMap (by omega))
+    let f : (Yoneda n) ⤳ (Yoneda (n+1)) := YonMap (by omega)
     PredSubst φ f
 
-def ToTType.PredPiAbs (φ : ToTPred (Prod Δ Γ)) : Δ ⤳ (PredPi Γ) where
+-- PredPi Γ is the Π type Π Γ ToTProp
+-- def ToTType.PredPi (Γ : ToTType) : ToTType where
+--   F n := ToTPred (Prod Γ (Yoneda n))
+--   restr n φ :=
+--     let f : (Prod Γ (Yoneda n)) ⤳ (Prod Γ (Yoneda (n+1))) := ProdHom ToTType.id (YonMap (by omega))
+--     PredSubst φ f
+
+def ToTType.Code (φ : ToTPred Γ) : Γ ⤳ ToTProp where
   val n δ :=
-    let ψ := fun {m} p => φ.val ⟨restrmap p.snd.property δ, p.fst ⟩
-    let prop : ∀ (m : Nat) (ρ : (Prod Γ (Yoneda n)).F (m+1)) , ψ ρ → ψ ((Prod Γ (Yoneda n)).restr m ρ) :=
+    let ψ := fun {m} y => φ.val (restrmap y.property δ)
+    let prop : ∀ (m : Nat) (ρ : (Yoneda n).F (m+1)) , ψ ρ → ψ ((Yoneda n).restr m ρ) :=
       by
        intro m ρ p
        simp[ψ]
-       sorry
+       simp[ψ] at p
+       let q := φ.property m _ p
+       let mn := ρ.property
+       let r:= @ToTType.restrmapEq m n Γ mn (by omega) δ
+       rw [← r]
+       apply q
     ⟨ ψ , prop ⟩
   property := _
 
-def ToTType.PredPiApp (f : Δ ⤳ PredPi Γ) : ToTPred (Prod Δ Γ) where
-  val n {δγ} :=
-    let
-      δ : Δ.F n := δγ.fst -- Prod.fst δγ -- _ - fst δγ
+def ToTType.PropEl : ToTPred Γ := True
+
+def ToTType.PropElem (f : Γ ⤳ ToTProp) : ToTPred Γ  :=
+  PredSubst PropEl f
+
+--where
+--  val n {γ} :=
+--    let
+--      δ : Δ.F n := δγ.fst -- Prod.fst δγ -- _ - fst δγ
       --f.val n δ n
       -- I dont understand why δ does not type check
-  property := _
+--  property := _
 
 
 def ToTType.PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
