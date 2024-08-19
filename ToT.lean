@@ -849,18 +849,6 @@ def ToTType.PropEl : ToTPred Γ := True
 def ToTType.PropElem (f : Γ ⤳ ToTProp) : ToTPred Γ  :=
   PredSubst PropEl f
 
---where
---  val n {γ} :=
---    let
---      δ : Δ.F n := δγ.fst -- Prod.fst δγ -- _ - fst δγ
-      --f.val n δ n
-      -- I dont understand why δ does not type check
---  property := _
-
-
-def ToTType.PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
-  Sequent True φ
-
 def ToTType.PLaterProp (φ : ToTPred (◁ Γ)) : {n : Nat} → (γ : Γ.F n) → Prop
   | 0, _ => true
   | _+1, γ => φ.val γ
@@ -879,3 +867,17 @@ def ToTType.PEarlier (φ : ToTPred Γ) : ToTPred (◁ Γ) where
   property := by
     intro n γ
     apply (φ.property (n+1) γ)
+
+--def ToTType.PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
+-- Sequent True φ
+
+def ToTType.PredLiftStr {A : Type} (φ : ToTPred A) : ToTPred (ToTType.Str A) :=
+  let dfun : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ (▷ (Fun (Str A) ToTProp)) := fst
+  let hd : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ A := comp snd Str.head
+  let tl : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ (▷ (Str A)) := comp snd Str.tail
+  -- Finish second part below
+  let help : ToTPred (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) := Conj (PredSubst φ hd) _
+  let helper : (▷ (Fun (Str A) ToTProp)) ⤳ (Fun (Str A) ToTProp) := lam (Code help)
+  let f : Unit ⤳ (Fun (Str A) ToTProp) := (fixpoint (Fun (Str A) ToTProp) helper)
+  let g : (Str A)  ⤳ ToTProp := comp (pair (comp unitFinal f) id) ev
+  PropElem g
