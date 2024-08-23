@@ -1012,7 +1012,8 @@ def ToTType.PLaterProp : ToTPred (▷ ToTProp) := PLater (True ToTProp)
 --def ToTType.PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
 -- Sequent True φ
 
-def ToTType.PredLiftStr {A : Type} (φ : ToTPred A) : ToTPred (ToTType.Str A) :=
+def ToTType.PredLiftStr {A : Type} (ψ : A → Prop) : ToTPred (ToTType.Str A) :=
+  let φ := AsToTPred ψ
   let hd : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ A := comp snd Str.head
   let tl : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ (▷ (Str A)) := comp snd Str.tail
   let tlcond : ToTPred (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) := PredSubst PLaterProp (comp (pair fst tl) appfun)
@@ -1023,25 +1024,24 @@ def ToTType.PredLiftStr {A : Type} (φ : ToTPred A) : ToTPred (ToTType.Str A) :=
   PropElem g
 
 -- def ToTType.PredLiftStrFold : Sequent (Conj (PredSubst φ hd) (PredSubst (PLater (PredLiftStr φ)) Str.tail)) (PredLiftStr φ) :=
-  def ToTType.PredLiftStrFold (p : Proof (PredSubst φ hd)) (q : Proof (PredSubst (PLater (PredLiftStr φ)) Str.tail)) : Proof (PredLiftStr φ) :=
+  def ToTType.PredLiftStrFold (p : Proof (PredSubst (AsToTPred φ) hd)) (q : Proof (PredSubst (PLater (PredLiftStr φ)) Str.tail)) : Proof (PredLiftStr φ) :=
     by sorry
 
 def ToTType.PredLiftStrHelp {φ : A → Prop} (p : forall a, φ a)
-   : ProofImpl (PLaterFib (ForallCl (PredLiftStr (AsToTPred φ)))) (ForallCl (PredLiftStr (AsToTPred φ)))
+   : ProofImpl (PLaterFib (ForallCl (PredLiftStr φ))) (ForallCl (PredLiftStr φ))
    :=
-  let hdproof : ProofImpl (PredSubst (PLaterFib (ForallCl (PredLiftStr (AsToTPred φ)))) fst) (PredSubst (AsToTPred φ) Str.head) :=
+  let hdproof : ProofImpl (PredSubst (PLaterFib (ForallCl (PredLiftStr  φ))) fst) (PredSubst (AsToTPred φ) Str.head) :=
     by
       sorry
-  let tlproof : ProofImpl (PredSubst (PLaterFib (ForallCl (PredLiftStr (AsToTPred φ)))) fst) (PredSubst (PLater (PredLiftStr (AsToTPred φ))) Str.tail) :=
+  let tlproof : ProofImpl (PredSubst (PLaterFib (ForallCl (PredLiftStr φ))) fst) (PredSubst (PLater (PredLiftStr φ)) Str.tail) :=
     by
       sorry
-  -- let q : Sequent (PredSubst (PredSubst (PLater (ForallCl (PredLiftStr φ))) next) fst) (PredLiftStr φ) := PredLiftStrFold hdproof tlproof
   ForallIntro (PredLiftStrFold hdproof tlproof)
 
 
 
 def ToTType.PredLiftStrProof (p : Proof φ) : Proof (ForallCl (PredLiftStr φ)) :=
-  by sorry -- Pfix (ToTType.PredLiftStrHelp p)
+  ForallIntroCl (Pfix _)
 
 -- Add tail condition to the below
 def ToTType.PredLiftStrPretty  {A : Type} : Box (((A : ToTType).Fun ToTProp).Fun ((ToTType.Str A).Fun ToTProp)) :=
