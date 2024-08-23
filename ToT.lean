@@ -495,6 +495,8 @@ def ToTType.Str.head {A : Type} : ToTType.Str A ⤳ A where
                   | zero => simp[StrR]
                   | succ m _ => simp[Later,StrR]
 
+def ToTType.Str.headFun {A : Type} (str : Γ ⤳ ToTType.Str A) : Γ ⤳ A := comp str head
+
 def ToTType.Str.consmap {Γ : ToTType} {B : Type} (g : Γ ⤳ B) (f : Γ ⤳ ▷(ToTType.Str B)) (n : Nat) : Γ.F n → (ToTType.Str B).F n
   := fun γ => StrUnfold B n ▸ (g.val n γ, f.val n γ)
 
@@ -532,6 +534,7 @@ syntax ToTExpr "::" ToTExpr : ToTExpr
 syntax "adv(" ToTExpr ")" : ToTExpr
 syntax "delay(" ToTExpr ")" : ToTExpr
 syntax "(" ToTExpr ")" : ToTExpr
+syntax "head(" ToTExpr ")" : ToTExpr
 syntax "box(" ToTExpr ")" : term
 
 structure Ctxt where
@@ -594,6 +597,9 @@ partial def elabToTExpr (vars : Ctxt) (levels : NameMap Nat) (stx : TSyntax `ToT
   | `(ToTExpr|delay($d)) => do
     let e <- elabToTExpr vars.tick levels d
     `(ToTType.delay $e)
+  | `(ToTExpr|head($d)) => do
+    let arg <- elabToTExpr vars levels d
+    `(ToTType.Str.headFun $arg)
   | `( ToTExpr|($t)) => elabToTExpr vars levels t
   | _ => throwErrorAt stx "Did not understand"
 
@@ -677,11 +683,17 @@ def ToTType.Str.from : Nat ⤳ (Str Nat) :=
 
 def ToTType.Str.natseq : Box (Str Nat) := comp (delta (fun _ => 0)) Str.from
 
+/-- info: [0, 1, 2, 3, 4, 5, 6, 7] -/
+#guard_msgs in
 #eval ToTType.Str.take (ToTType.Str.natseq) 8
 
+/-- info: [5, 5, 5, 5, 5, 5, 5, 5] -/
+#guard_msgs in
 #eval ToTType.Str.take pretty_from 8
 
 --#eval ToTType.Str.take zeros 8
+/-- info: [0, 0, 0, 0, 0, 0, 0, 0] -/
+#guard_msgs in
 #eval ToTType.Str.take pretty_zeros 8
 
 --#check Nat ⤳ Nat
@@ -725,15 +737,13 @@ def ToTType.Compr (A : Fam Γ) : ToTType where
 def ToTType.ToTPred (Γ : ToTType) : Type
   := {φ : {n : Nat} → (γ : Γ.F n) → Prop // ∀ n γ, φ γ → φ (Γ.restr n γ)}
 
-def ToTType.Sequent (φ ψ : ToTPred Γ) : Prop
-  := ∀ n (γ : Γ.F n), (φ.val γ) → (ψ.val γ)
+def ToTType.AsToTPred (φ : A → Prop) : ToTPred A where
+  val := φ
+  property := by sorry
 
-def ToTType.SeqComp (ρ φ ψ : ToTPred Γ) (p : Sequent ρ φ) (q : Sequent φ ψ) : Sequent ρ ψ :=
-  by
-   simp[Sequent]
-   intro n γ
-   intro a
-   exact (q n γ (p n γ a))
+/-- instance {A : Type} : Coe (A → Prop) (ToTPred A) where
+  coe T := { F := fun _ => T, restr := fun _ => id}
+  --/
 
 def ToTType.PredSubst (φ : ToTPred Γ) (σ : Δ ⤳ Γ) : ToTPred Δ where
   val {n} δ := φ.val (σ.val n δ)
@@ -743,6 +753,43 @@ def ToTType.PredSubst (φ : ToTPred Γ) (σ : Δ ⤳ Γ) : ToTPred Δ where
     have p := σ.property n γ
     rw[← p]
     exact φ.property n (σ.val (n + 1) γ)
+
+
+def ToTType.PCompr (φ : ToTPred Γ) : ToTType where
+  F n := {γ : Γ.F n // φ.val γ}
+  restr n γp := ⟨ Γ.restr n γp.val , φ.property n γp.val γp.property ⟩
+
+def ToTType.PComprPr (φ : ToTPred Γ) : (PCompr φ) ⤳ Γ where
+  val := fun n γp => γp.val
+  property := by sorry
+
+def ToTType.Proof (φ : ToTPred Γ) : Prop :=
+  ∀ n (γ : Γ.F n), φ.val γ
+
+def ToTType.AsToTProof (p : ∀ x, φ x) : Proof (AsToTPred φ) :=
+  by sorry
+
+-- The next one reintroduces sequents under different name
+def ToTType.ProofImpl (φ ψ : Pred Γ) : Type :=
+  Proof (PredSubst ψ (PComprPr φ))
+
+-- Forget about sequents, use Proof
+/--
+def ToTType.Sequent (φ ψ : ToTPred Γ) : Prop
+  := ∀ n (γ : Γ.F n), (φ.val γ) → (ψ.val γ)
+
+def ToTType.SeqTrivial : Sequent φ φ :=
+  by
+    sorry
+
+def ToTType.SeqComp (ρ φ ψ : ToTPred Γ) (p : Sequent ρ φ) (q : Sequent φ ψ) : Sequent ρ ψ :=
+  by
+   simp[Sequent]
+   intro n γ
+   intro a
+   exact (q n γ (p n γ a))
+
+-/
 
 def ToTType.Conj (φ ψ : ToTPred Γ) : ToTPred Γ where
   val γ := φ.val γ ∧ ψ.val γ
@@ -754,6 +801,16 @@ def ToTType.Conj (φ ψ : ToTPred Γ) : ToTPred Γ where
     . exact φ.property n γ p
     . exact ψ.property n γ q
 
+def ToTType.ConjIntro (p : Proof φ) (q : Proof ψ) : Proof (Conj φ ψ) :=
+  by sorry
+
+def ToTType.ConjElimL (p : Proof (Conj φ ψ)) : Proof φ :=
+  by sorry
+
+def ToTType.ConjElimR (p : Proof (Conj φ ψ)) : Proof ψ :=
+  by sorry
+
+/--
 def ToTType.ConjIntro (ρ φ ψ : ToTPred Γ) (p : Sequent ρ φ) (q : Sequent ρ ψ) : Sequent ρ (Conj φ ψ) :=
   by
     simp[Sequent]
@@ -778,38 +835,87 @@ def ToTType.ConjElimR (ρ φ ψ : ToTPred Γ) (p : Sequent ρ (Conj φ ψ)) : Se
     have r := p n γ q
     let ⟨ _ , r2 ⟩ :=  r
     exact r2
+-/
 
-def ToTType.True : ToTPred Γ where
+def ToTType.Forall (φ : ToTPred (Prod Γ Δ)) : ToTPred Γ where
+  val {n} γ := ∀ m, (p : m≤ n) → ∀ δ , φ.val ⟨ restrmap p γ , δ ⟩
+  property := by
+    intro n γ
+    sorry
+
+def ToTType.ForallCl (φ : ToTPred Γ) : ToTPred Unit :=
+  Forall (PredSubst φ snd)
+
+def ToTType.ForallIntro {φ : ToTPred (Prod Γ Δ)} (p : Proof φ) : Proof (Forall φ) :=
+  by sorry
+
+def ToTType.ForallIntroCl (p : Proof φ) : Proof (ForallCl φ) :=
+  by sorry
+
+def ToTType.ForallElim {φ : ToTPred (Prod Γ Δ)} (p : Proof (Forall φ)) : Proof φ :=
+  by sorry
+
+def ToTType.ForallElimCl (p : Proof (ForallCl φ)) : Proof φ :=
+  by sorry
+
+/--
+def ToTType.ForallIntro (p : Sequent (PredSubst φ fst) ψ) : Sequent φ (Forall ψ) :=
+  by
+    sorry
+
+def ToTType.ForallElim (p : Sequent φ (Forall ψ)) : Sequent (PredSubst φ fst) ψ :=
+  by
+    sorry
+
+def ToTType.ForallClIntro (p : Sequent (PredSubst φ fst) ψ) : Sequent φ (ForallCl ψ) :=
+  by
+    sorry
+
+def ToTType.ForallClElim (p : Sequent φ (ForallCl ψ)) : Sequent (PredSubst φ fst) ψ :=
+  by
+    sorry
+-/
+
+def ToTType.True (Γ : ToTType) : ToTPred Γ where
   val γ := true
   property := by
     intro n _
     simp
 
-def ToTType.proofsOf (φ : Prop) : Type := { x : Unit // φ}
+def ToTType.Top {Γ : ToTType} : Proof (True Γ) :=
+  by
+    sorry
 
-def ToTType.proofsOfEl (φ : Prop) (p : φ) : (proofsOf φ) where
-  val := ()
-  property := p
+structure ToTType.proofsOf (φ : Prop) : Type where
+  proof : φ
+--{ x : Unit // φ}
 
-def ToTType.proofsOfImp (p : φ → ψ) (x : proofsOf φ) : (proofsOf ψ) where
+def ToTType.proofsOfEl (φ : Prop) (p : φ) : (proofsOf φ) := ⟨ p ⟩
+
+def ToTType.proofsOfImp (p : φ → ψ) (x : proofsOf φ) : (proofsOf ψ) :=
+  let ⟨ q ⟩ := x
+  ⟨ p q ⟩
 --  proofsOfEl ψ (p (x.property))
-  val := x.val
-  property := p x.property
+--  val := x.val
+--  property := p x.property
 
 def ToTType.UnitSet (x y : Unit) : x=y :=
   by
    ext
 
+@[simp]
 def ToTType.proofsOfSet (x y : proofsOf φ) : x = y :=
   by
-   sorry
+   cases x
+   cases y
+   rfl
 
 def ToTType.Yoneda (n : Nat) : ToTType where
   F {m} := proofsOf (m ≤ n)
   restr m := proofsOfImp (by omega)
 
 def ToTType.YonMap (p : m ≤ n) : (Yoneda m) ⤳ (Yoneda n) where
-  val o q := proofsOfEl (o ≤ n) (by let r : (o ≤ m) := q.property ; omega)
+  val o q := proofsOfEl (o ≤ n) (by let r : (o ≤ m) := q.proof ; omega)
   property := by
     intro n x
     apply proofsOfSet
@@ -829,38 +935,59 @@ def ToTType.ToTProp : ToTType where
 --     PredSubst φ f
 
 def ToTType.Code (φ : ToTPred Γ) : Γ ⤳ ToTProp where
-  val n δ :=
-    let ψ := fun {m} y => φ.val (restrmap y.property δ)
+  val n γ :=
+    let ψ := fun {m} y => φ.val (restrmap y.proof γ)
     let prop : ∀ (m : Nat) (ρ : (Yoneda n).F (m+1)) , ψ ρ → ψ ((Yoneda n).restr m ρ) :=
       by
        intro m ρ p
        simp[ψ]
        simp[ψ] at p
        let q := φ.property m _ p
-       let mn := ρ.property
-       let r:= @ToTType.restrmapEq m n Γ mn (by omega) δ
+       let mn := ρ.proof
+       let r:= @ToTType.restrmapEq m n Γ mn (by omega) γ
        rw [← r]
        apply q
     ⟨ ψ , prop ⟩
-  property := _
+  property := by
+    sorry
 
-def ToTType.PropEl : ToTPred Γ := True
+def ToTType.PropEl : ToTPred Γ := True Γ
 
 def ToTType.PropElem (f : Γ ⤳ ToTProp) : ToTPred Γ  :=
   PredSubst PropEl f
 
-def ToTType.PLaterProp (φ : ToTPred (◁ Γ)) : {n : Nat} → (γ : Γ.F n) → Prop
+/- def ToTType.PLaterVal (φ : ToTPred (◁ Γ)) : {n : Nat} → (γ : Γ.F n) → Prop
   | 0, _ => true
   | _+1, γ => φ.val γ
 
 def ToTType.PLater (φ : ToTPred (◁ Γ)) : ToTPred Γ where
-  val := PLaterProp φ
+  val := PLaterVal φ
   property := by
     intro n
     cases n
-    . simp[PLaterProp]
-    . simp[PLaterProp]
+    . simp[PLaterVal]
+    . simp[PLaterVal]
       apply φ.property
+ -/
+
+def ToTType.PLaterVal (φ : ToTPred Γ) : {n : Nat} → (γ : (▷ Γ).F n) → Prop
+  | 0, _ => true
+  | _+1, γ => φ.val γ
+
+def ToTType.PLater (φ : ToTPred Γ) : ToTPred (▷ Γ) where
+  val := PLaterVal φ
+  property := by
+    intro n
+    cases n
+    . simp[PLaterVal]
+    . simp[PLaterVal]
+      apply φ.property
+
+def ToTType.PLaterFib (φ : ToTPred Γ) : ToTPred Γ :=
+  PredSubst (PLater φ) next
+
+def ToTType.PLatBind (φ : ToTPred (◁ Γ)) : ToTPred Γ :=
+  PredSubst (PLater φ) (delay  (ToTType.id))
 
 def ToTType.PEarlier (φ : ToTPred Γ) : ToTPred (◁ Γ) where
   val := φ.val
@@ -868,16 +995,84 @@ def ToTType.PEarlier (φ : ToTPred Γ) : ToTPred (◁ Γ) where
     intro n γ
     apply (φ.property (n+1) γ)
 
+
+-- def ToTType.Pfix (p : Sequent (Conj φ (PredSubst (PLater ψ) ToTType.next)) ψ) : Sequent φ ψ  :=
+def ToTType.Pfix {φ : ToTPred Γ} (p : Proof (PredSubst φ (PComprPr (PLaterFib φ))))  : Proof φ  :=
+  by
+    sorry
+
+/-- def ToTType.PfixCl (p : Sequent (PredSubst (PLater ψ) ToTType.next) ψ) : Sequent True ψ :=
+  -- Pfix (SeqComp (ConjElimR (Conj True (PredSubst (PLater ψ) ToTType.next)) True (PredSubst (PLater ψ) ToTType.next) SeqTrivial) p)
+  by
+    sorry
+--/
+
+def ToTType.PLaterProp : ToTPred (▷ ToTProp) := PLater (True ToTProp)
+
 --def ToTType.PBox (φ : ToTPred Γ) (γ : Box Γ) : Prop :=
 -- Sequent True φ
 
 def ToTType.PredLiftStr {A : Type} (φ : ToTPred A) : ToTPred (ToTType.Str A) :=
-  let dfun : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ (▷ (Fun (Str A) ToTProp)) := fst
   let hd : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ A := comp snd Str.head
   let tl : (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) ⤳ (▷ (Str A)) := comp snd Str.tail
-  -- Finish second part below
-  let help : ToTPred (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) := Conj (PredSubst φ hd) _
+  let tlcond : ToTPred (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) := PredSubst PLaterProp (comp (pair fst tl) appfun)
+  let help : ToTPred (Prod (▷ (Fun (Str A) ToTProp)) (Str A)) := Conj (PredSubst φ hd) tlcond
   let helper : (▷ (Fun (Str A) ToTProp)) ⤳ (Fun (Str A) ToTProp) := lam (Code help)
   let f : Unit ⤳ (Fun (Str A) ToTProp) := (fixpoint (Fun (Str A) ToTProp) helper)
   let g : (Str A)  ⤳ ToTProp := comp (pair (comp unitFinal f) id) ev
   PropElem g
+
+-- def ToTType.PredLiftStrFold : Sequent (Conj (PredSubst φ hd) (PredSubst (PLater (PredLiftStr φ)) Str.tail)) (PredLiftStr φ) :=
+  def ToTType.PredLiftStrFold (p : Proof (PredSubst φ hd)) (q : Proof (PredSubst (PLater (PredLiftStr φ)) Str.tail)) : Proof (PredLiftStr φ) :=
+    by sorry
+
+def ToTType.PredLiftStrHelp {φ : A → Prop} (p : forall a, φ a)
+   : ProofImpl (PLaterFib (ForallCl (PredLiftStr (AsToTPred φ)))) (ForallCl (PredLiftStr (AsToTPred φ)))
+   :=
+  let hdproof : ProofImpl (PredSubst (PLaterFib (ForallCl (PredLiftStr (AsToTPred φ)))) fst) (PredSubst (AsToTPred φ) Str.head) :=
+    by
+      sorry
+  let tlproof : ProofImpl (PredSubst (PLaterFib (ForallCl (PredLiftStr (AsToTPred φ)))) fst) (PredSubst (PLater (PredLiftStr (AsToTPred φ))) Str.tail) :=
+    by
+      sorry
+  -- let q : Sequent (PredSubst (PredSubst (PLater (ForallCl (PredLiftStr φ))) next) fst) (PredLiftStr φ) := PredLiftStrFold hdproof tlproof
+  ForallIntro (PredLiftStrFold hdproof tlproof)
+
+
+
+def ToTType.PredLiftStrProof (p : Proof φ) : Proof (ForallCl (PredLiftStr φ)) :=
+  by sorry -- Pfix (ToTType.PredLiftStrHelp p)
+
+-- Add tail condition to the below
+def ToTType.PredLiftStrPretty  {A : Type} : Box (((A : ToTType).Fun ToTProp).Fun ((ToTType.Str A).Fun ToTProp)) :=
+  box(fun (φ : _) => fix (ψ : ((Str A).Fun ToTProp)) => fun (xs : _)  => φ (head(xs)))
+
+
+/-
+  Sketch proof using tactics:
+   Assumption: φ : A → Prop
+   Construct LiftPredStr φ : Pred (Str A) such that LiftPredStr φ (xs) equivalent to
+   φ(hd(xs)) ∧ ▷ LiftPredStr φ (adv(tl(xs)))
+   Want to prove
+   ∀ x, φ (x) → ∀ xs, LiftPredStr φ xs
+   Proof should proceed as follows:
+     intro p
+     guarded_recursion
+       At this point the context should be
+         p : ∀ x, φ (x)
+         IH : ▷ (∀ xs, LiftPredStr φ xs)
+     intro xs
+     [Something to unfold LiftPredStr φ xs]
+     cases (not sure what the tactic name is, need to prove conjunction)
+     . apply p
+     . tickintro
+         At this point context is
+            p : ∀ x, φ (x)
+            IH : ▷ (∀ xs, LiftPredStr φ xs)
+            xs : Str A
+            tick
+          Must prove
+          LiftPredStr φ (adv(tl(xs)))
+        exact (adv IH (adv (tl(xs))))
+
+  -/
