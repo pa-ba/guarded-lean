@@ -884,7 +884,9 @@ def ToTType.True (Γ : ToTType) : ToTPred Γ where
 
 def ToTType.Top {Γ : ToTType} : Proof (True Γ) :=
   by
-    sorry
+    simp[Proof]
+    intro n γ
+    simp[True]
 
 structure ToTType.proofsOf (φ : Prop) : Type where
   proof : φ
