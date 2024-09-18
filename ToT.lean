@@ -741,6 +741,8 @@ def ToTType.AsToTPred (φ : A → Prop) : ToTPred A where
   val := φ
   property := by sorry
 
+
+
 /-- instance {A : Type} : Coe (A → Prop) (ToTPred A) where
   coe T := { F := fun _ => T, restr := fun _ => id}
   --/
@@ -753,6 +755,10 @@ def ToTType.PredSubst (φ : ToTPred Γ) (σ : Δ ⤳ Γ) : ToTPred Δ where
     have p := σ.property n γ
     rw[← p]
     exact φ.property n (σ.val (n + 1) γ)
+
+def ToTType.AsToTPred' (φ : A → Prop) : ToTPred (Prod Unit A) :=
+  PredSubst (AsToTPred φ) snd
+
 
 
 def ToTType.PCompr (φ : ToTPred Γ) : ToTType where
@@ -770,7 +776,7 @@ def ToTType.AsToTProof (p : ∀ x, φ x) : Proof (AsToTPred φ) :=
   by sorry
 
 -- The next one reintroduces sequents under different name
-def ToTType.ProofImpl (φ ψ : Pred Γ) : Type :=
+def ToTType.ProofImpl (φ ψ : ToTPred Γ) : Prop :=
   Proof (PredSubst ψ (PComprPr φ))
 
 -- Forget about sequents, use Proof
@@ -809,6 +815,13 @@ def ToTType.ConjElimL (p : Proof (Conj φ ψ)) : Proof φ :=
 
 def ToTType.ConjElimR (p : Proof (Conj φ ψ)) : Proof ψ :=
   by sorry
+
+def ToTType.Impl (φ ψ : ToTPred Γ) : ToTPred Γ where
+ val {n} γ := ∀ m, (p : m ≤ n) → φ.val (restrmap p γ) → ψ.val (restrmap p γ)
+ property := by sorry
+
+
+
 
 /--
 def ToTType.ConjIntro (ρ φ ψ : ToTPred Γ) (p : Sequent ρ φ) (q : Sequent ρ ψ) : Sequent ρ (Conj φ ψ) :=
@@ -1049,6 +1062,199 @@ def ToTType.PredLiftStrProof (p : Proof φ) : Proof (ForallCl (PredLiftStr φ)) 
 def ToTType.PredLiftStrPretty  {A : Type} : Box (((A : ToTType).Fun ToTProp).Fun ((ToTType.Str A).Fun ToTProp)) :=
   box(fun (φ : _) => fix (ψ : ((Str A).Fun ToTProp)) => fun (xs : _)  => φ (head(xs)))
 
+axiom LiftPredStr {A} : (φ : A → Prop) → ToTType.ToTPred (ToTType.Prod Unit (ToTType.Str A))
+
+declare_syntax_cat ctxt
+declare_syntax_cat ctxt_elem
+declare_syntax_cat stmt
+syntax "✓" : ctxt_elem
+syntax (name:=binder) ident " ∈ " term : ctxt_elem
+syntax ident " : " stmt : ctxt_elem
+syntax ctxt_elem : ctxt
+syntax "·" : ctxt
+syntax ctxt ", " ctxt_elem : ctxt
+
+syntax stmt " → " stmt : stmt
+syntax ident : stmt
+syntax "∀ " ident ", " stmt : stmt
+syntax "∀ " ident " : " term ", " stmt : stmt
+syntax "[" term "] " ident* : stmt -- apply ToT-pred in Lean syntax to arguments
+syntax "(" stmt ")" : stmt
+syntax "↑" term : stmt -- lift predicate to stream
+syntax "![" ctxt " | " stmt "]" : term
+syntax "!{" ctxt "}" : term
+syntax "![" stmt "]" : term
+syntax "¡" ctxt " | " ident* "!" : term
+syntax "¡" ctxt "€" ident "!" : term
+
+declare_syntax_cat tot_proof_state
+syntax (ctxt_elem ppLine)* "⊨ " stmt : tot_proof_state
+namespace Internals
+scoped syntax (name:=embedProof) tot_proof_state : term
+end Internals
+
+open Lean in
+macro_rules
+  | `(¡ $_ | !) => `((ToTType.unitFinal ))
+  | `(¡ $Γ | $xs:ident* $x:ident !) => `(ToTType.pair ¡ $Γ | $xs* ! ¡ $Γ € $x !)
+  | `(¡ · € $x !) => Macro.throwErrorAt x s!"Unknown: {x}"
+  | `(¡ $y:ident ∈ $_:term € $x:ident !) =>
+    if x.getId == y.getId then
+      `(ToTType.snd)
+    else Macro.throwErrorAt x s!"Unknown: {x}"
+  | `(¡ $Γ, $y:ident ∈ $_:term € $x:ident !) =>
+    if x.getId == y.getId then
+      `(ToTType.snd)
+    else ``(ToTType.comp ToTType.fst ¡ $Γ € $x !)
+
+
+
+macro_rules
+  | `(![$Γ | ($s)]) => `(![$Γ | $s])
+  | `(![$s]) => `(![· | $s])
+  | `(![ $Γ | $s1 → $s2]) => `(ToTType.Impl ![$Γ | $s1] ![$Γ | $s2])
+  | `(![ $Γ | ∀ $x:ident, $s:stmt]) =>
+    `(let t := _; ToTType.Forall (Δ := t) ![$Γ, $x:ident ∈ t | $s])
+  | `(![ $Γ | ∀ $x:ident : $t, $s]) =>
+    `(let t := $t; ToTType.Forall (Δ := t) ![$Γ, $x:ident ∈ t | $s])
+  | `(![ $_ | True]) => `(ToTType.True _)
+  | `(![ $Γ | [ $pred ] $arg*]) =>
+    ``(ToTType.PredSubst $pred (¡ $Γ | $arg* !))
+  | `(!{·}) => ``((Unit : ToTType))
+  | `(!{✓}) => ``((◁ Unit : ToTType))
+  | `(!{$Γ:ctxt, ✓}) => ``((◁ !{$Γ} : ToTType))
+  | `(!{$x:ident ∈ $t}) => ``((ToTType.Prod Unit $t : ToTType))
+  | `(!{$Γ, $x:ident ∈ $t}) =>
+    ``((ToTType.Prod !{$Γ} $t : ToTType))
+  | `(!{$x:ident : $t}) => ``((@ToTType.PCompr Unit ![· | $t] : ToTType))
+  | `(!{$Γ:ctxt, $x:ident : $t}) =>
+    ``((@ToTType.PCompr !{$Γ} ![$Γ | $t] : ToTType))
+/-- info: { F := fun x => Unit, restr := fun x => id } : ToTType -/
+#guard_msgs in
+#check !{·}
+
+/--
+info: { F := fun x => Unit, restr := fun x => id }.Prod { F := fun x => Nat, restr := fun x => id } : ToTType
+-/
+#guard_msgs in
+#check !{x ∈ Nat}
+
+/--
+info: (◁({ F := fun x => Unit, restr := fun x => id }.Prod { F := fun x => Nat, restr := fun x => id }).Prod
+        { F := fun x => String, restr := fun x => id }).Prod
+  { F := fun x => Nat, restr := fun x => id } : ToTType
+-/
+#guard_msgs in
+#check !{x ∈ Nat, y ∈ String, ✓, z ∈ Nat}
+
+/--
+info: ToTType.PCompr
+  ((◁({ F := fun x => Unit, restr := fun x => id }.Prod { F := fun x => Nat, restr := fun x => id }).Prod
+            { F := fun x => String, restr := fun x => id }).Prod
+      { F := fun x => Nat, restr := fun x => id }).True : ToTType
+-/
+#guard_msgs in
+#check !{x ∈ Nat, y ∈ String, ✓, z ∈ Nat, t : True}
+
+#check !{x ∈ Nat, y ∈ String, ✓, z ∈ Nat, t : ∀ x, True}
+
+#check !{x ∈ Nat, y ∈ String, ✓, z ∈ Nat, t : ∀ x : Int, True}
+
+open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
+def annAsTerm {any} (stx : TSyntax any) : DelabM (TSyntax any) :=
+  (⟨·⟩) <$> annotateTermInfo ⟨stx.raw⟩
+
+open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
+partial def delabArgs : DelabM (TSyntaxArray `ident) := do
+  let e ← getExpr
+  match_expr e with
+  | ToTType.unitFinal _ => pure #[]
+  | ToTType.pair _ _ _ _ _ =>
+    let pre ← withAppFn <| withAppArg delabArgs
+    let me ← withAppArg <| annAsTerm <| ← `(ident|x)
+    return pre.push me
+  | _ => failure
+
+
+open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
+partial def delabStmtInner : DelabM (TSyntax `stmt) := do
+  let e ← getExpr
+  let stx ←
+    match e with
+    | .letE _ _ _ body _ => withLetBody delabStmtInner
+    | _ =>
+    match_expr e with
+    | ToTType.Impl _ _ _ =>
+      let s1 ← withAppFn <| withAppArg delabStmtInner
+      let s2 ← withAppArg delabStmtInner
+      `(stmt| $s1 → $s2)
+    | ToTType.Forall _ _ _ =>
+      let x := mkIdent (← mkFreshBinderName)
+      let body ← withAppArg delabStmtInner
+      `(stmt| ∀ $x, $body)
+    | ToTType.PredSubst _ _ _ _ =>
+      let pred ← withAppFn <| withAppArg delab
+      let args ← withAppArg delabArgs
+      `(stmt| [$pred] $args*)
+    | _ =>
+      `(stmt| [$(← delab)])
+  annAsTerm stx
+
+open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
+partial def delabProofCtxt : DelabM (TSyntaxArray `ctxt_elem) := do
+  match_expr ← getExpr with
+  | ToTType.PCompr _ _ =>
+    let Γ ← withAppFn <| withAppArg delabProofCtxt
+    let φ ← withAppArg do delabStmtInner
+    return Γ.push (← withAppArg <| annAsTerm (← `(ctxt_elem|x : $φ)))
+  | ToTType.mk _ _ =>
+    withAppFn <| withAppArg do
+      match (← getExpr) with
+      | .lam _ _ _ _ =>
+        withBindingBody `x do
+          match_expr (← getExpr) with
+          | Unit =>
+            pure #[]
+          | _ =>
+          failure
+      | _ => failure
+  | _ => failure
+
+open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
+open Internals in
+@[delab app.ToTType.Proof]
+partial def delabProof : Delab := do
+  match_expr ← getExpr with
+  | ToTType.Proof _ _ =>
+    let stmt ← withAppArg delabStmtInner
+    let ctxt ← withAppFn <| withAppArg delabProofCtxt
+    let prf ← `(tot_proof_state| $[$ctxt]* ⊨ $stmt)
+    pure ⟨prf.raw⟩
+  | _ => failure
+
+open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
+@[delab app.ToTType.Impl, delab app.ToTType.Forall]
+partial def delabStmt : Delab := do
+  -- This delaborator only understands a certain arity - give up if it's incorrect
+  guard <| match_expr ← getExpr with
+    | ToTType.Impl _ _ _ => true
+    | ToTType.Forall _ _ _ => true
+    | _ => false
+  match ← delabStmtInner with
+  | `(stmt|[$e]) => pure e
+  | e => `(term|![$(⟨e⟩)])
+
+theorem ToTType.liftOk (φ : A → Prop) : Proof (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
+
+
+theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [AsToTPred' φ] x) → (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
+  sorry
+
+theorem ToTType.liftOk'AfterIntro (φ : A → Prop) :
+    Proof (Γ := ToTType.PCompr (Γ := Unit) ![(∀ x : A, [AsToTPred' φ] x)]) ![ (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
+  skip
+
+-- TODO next time: we just finished part of the proof state delaborator; next step is to implement the intro tactic in the below.
 
 /-
   Sketch proof using tactics:
@@ -1056,7 +1262,7 @@ def ToTType.PredLiftStrPretty  {A : Type} : Box (((A : ToTType).Fun ToTProp).Fun
    Construct LiftPredStr φ : Pred (Str A) such that LiftPredStr φ (xs) equivalent to
    φ(hd(xs)) ∧ ▷ LiftPredStr φ (adv(tl(xs)))
    Want to prove
-   ∀ x, φ (x) → ∀ xs, LiftPredStr φ xs
+   (∀ x, φ (x)) → ∀ xs, LiftPredStr φ xs
    Proof should proceed as follows:
      intro p
      guarded_recursion
