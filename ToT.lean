@@ -820,8 +820,15 @@ def ToTType.Impl (φ ψ : ToTPred Γ) : ToTPred Γ where
  val {n} γ := ∀ m, (p : m ≤ n) → φ.val (restrmap p γ) → ψ.val (restrmap p γ)
  property := by sorry
 
-
-
+def ToTType.ImplIntro (p : Proof (Γ := PCompr φ) (PredSubst ψ (PComprPr φ))) : Proof (Impl φ ψ) :=
+  by
+   simp_all[Proof]
+   intro n γ
+   -- apply p n
+   simp[Impl]
+   intro m q r
+   simp_all[PCompr,PredSubst,PComprPr]
+   exact p m (⟨restrmap q γ, r ⟩)
 
 /--
 def ToTType.ConjIntro (ρ φ ψ : ToTPred Γ) (p : Sequent ρ φ) (q : Sequent ρ ψ) : Sequent ρ (Conj φ ψ) :=
