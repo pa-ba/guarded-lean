@@ -774,12 +774,14 @@ def ToTType.PComprPr (φ : ToTPred Γ) : (PCompr φ) ⤳ Γ where
 def ToTType.PredWeak (φ ψ : ToTPred Γ) : ToTPred (ToTType.PCompr φ)  := ToTType.PredSubst ψ (PComprPr φ)
 
 
+
 def ToTType.Proof (φ : ToTPred Γ) : Prop :=
   ∀ n (γ : Γ.F n), φ.val γ
 
+
+
 def ToTType.AsToTProof (p : ∀ x, φ x) : Proof (AsToTPred φ) :=
   by sorry
-
 
 
 -- The next one reintroduces sequents under different name
@@ -870,10 +872,58 @@ def ToTType.Forall (φ : ToTPred (Prod Γ Δ)) : ToTPred Γ where
     intro n γ
     sorry
 
+
+def ToTType.prodOverCompr : PCompr (Γ := (Prod Γ Δ)) (PredSubst φ fst) ⤳ Prod (PCompr (Γ := Γ) φ) Δ where
+  val := sorry
+  property := sorry
+
+def ToTType.comprOverProd : Prod (PCompr (Γ := Γ) φ) Δ ⤳ PCompr (Γ := (Prod Γ Δ)) (PredSubst φ fst) where
+  val n γ' :=
+    let ⟨⟨γ, p⟩, δ⟩ := γ'
+    ⟨(γ, δ), p⟩
+  property := sorry
+
+def isConst (f : α → β) := ∃ (y : β), ∀ (x : α), f x = y
+
+theorem ToTType.restrmap_const_id (A : ToTType) (c : isConst A.F) : (∀ n x, HEq (A.restr n x) x) → (x : A.F m) → HEq (restrmap (m := n) (A := A) p x) x := by
+  intro constRestr
+  let ⟨B, allB⟩ := c
+  intros
+  simp [restrmap, LThelp, restrmaphelp]
+  sorry
+
+
+theorem ToTType.restrmap_const_id' (A : Type) : HEq (restrmap (m := n) (A := A) p x) x := by
+  intro constRestr
+  sorry
+
+
+
+
+
+
+
+def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
+    Proof (Forall (PredSubst (PredWeak (PredSubst φ fst) ψ) comprOverProd)) ↔ Proof (PredWeak φ (Forall ψ))
+  := by
+  constructor
+  . intro h
+    intro n γ
+    simp [PredWeak, PredSubst, Forall, PComprPr]
+    intro m m_le_n δ
+    simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h
+    have := h n γ m m_le_n δ
+    simp [PComprPr, comprOverProd] at this
+
+
+
+
+
+
 def ToTType.ForallCl (φ : ToTPred Γ) : ToTPred Unit :=
   Forall (PredSubst φ snd)
 
-def ToTType.ForallIntro {φ : ToTPred (Prod Γ Δ)} (p : Proof φ) : Proof (Forall φ) :=
+def ToTType.ForallIntro {φ : ToTPred (Prod Γ A)} (p : Proof φ) : Proof (Γ := Γ) (Forall φ) :=
   by sorry
 
 def ToTType.ForallIntroCl (p : Proof φ) : Proof (ForallCl φ) :=
@@ -1275,13 +1325,44 @@ partial def delabStmt : Delab := do
 
 theorem ToTType.liftOk (φ : A → Prop) : Proof (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
 
-macro_rules
-| `(tactic|intro) =>
-  `(tactic|apply ImplIntro)
+namespace Internals
+scoped syntax "builtinIntro" : tactic
+macro_rules | `(tactic|builtinIntro) => `(tactic|intro)
+end Internals
+
+syntax (name := ourIntro) "intro" : tactic
+
+open ToTType in
+open Internals in
+macro_rules (kind := ourIntro)
+  | `(tactic|intro) =>
+    `(tactic|first | apply ImplIntro | apply ForallIntro | builtinIntro)
+
 
 theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [AsToTPred' φ] x) → (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   intro
+  conv =>
+    arg 1
+    apply prodOverCompr
+  apply ForallIntro
 
+-- @Proof ?Γ (![∀ x✝, [?φ] ]) : Prop
+
+--    @Forall ?Γ ?A ?φ : ?Γ.ToTPred
+
+-- @Proof
+--   (PCompr
+--     (let t := A;
+--     ![∀ x✝, [AsToTPred' φ] x✝]))
+--   (![∀ x✝, [LiftPredStr φ] x✝]) : Prop
+
+--    @PredWeak { F := fun x => Unit, restr := fun x => _root_.id }
+--     (let t := A;
+--     ![∀ x✝, [AsToTPred' φ] x✝])
+--     (let t := Str A;
+--     ![∀ x✝, [LiftPredStr φ] x✝]) : (PCompr
+--       (let t := A;
+--       ![∀ x✝, [AsToTPred' φ] x✝])).ToTPred
 
 theorem ToTType.liftOk'AfterIntro (φ : A → Prop) :
     Proof (Γ := ToTType.PCompr (Γ := Unit) ![(∀ x : A, [AsToTPred' φ] x)]) ![ (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
