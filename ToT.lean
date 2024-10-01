@@ -756,6 +756,7 @@ def ToTType.PredSubst (φ : ToTPred Γ) (σ : Δ ⤳ Γ) : ToTPred Δ where
     rw[← p]
     exact φ.property n (σ.val (n + 1) γ)
 
+
 def ToTType.AsToTPred' (φ : A → Prop) : ToTPred (Prod Unit A) :=
   PredSubst (AsToTPred φ) snd
 
@@ -769,15 +770,21 @@ def ToTType.PComprPr (φ : ToTPred Γ) : (PCompr φ) ⤳ Γ where
   val := fun n γp => γp.val
   property := by sorry
 
+/-- Weakening by a predicate-/
+def ToTType.PredWeak (φ ψ : ToTPred Γ) : ToTPred (ToTType.PCompr φ)  := ToTType.PredSubst ψ (PComprPr φ)
+
+
 def ToTType.Proof (φ : ToTPred Γ) : Prop :=
   ∀ n (γ : Γ.F n), φ.val γ
 
 def ToTType.AsToTProof (p : ∀ x, φ x) : Proof (AsToTPred φ) :=
   by sorry
 
+
+
 -- The next one reintroduces sequents under different name
 def ToTType.ProofImpl (φ ψ : ToTPred Γ) : Prop :=
-  Proof (PredSubst ψ (PComprPr φ))
+  Proof (PredWeak φ ψ)
 
 -- Forget about sequents, use Proof
 /--
@@ -820,7 +827,7 @@ def ToTType.Impl (φ ψ : ToTPred Γ) : ToTPred Γ where
  val {n} γ := ∀ m, (p : m ≤ n) → φ.val (restrmap p γ) → ψ.val (restrmap p γ)
  property := by sorry
 
-def ToTType.ImplIntro (p : Proof (Γ := PCompr φ) (PredSubst ψ (PComprPr φ))) : Proof (Impl φ ψ) :=
+def ToTType.ImplIntro (p : Proof (Γ := PCompr φ) (PredWeak φ ψ)) : Proof (Impl φ ψ) :=
   by
    simp_all[Proof]
    intro n γ
@@ -1182,6 +1189,16 @@ partial def delabArgs : DelabM (TSyntaxArray `ident) := do
     return pre.push me
   | _ => failure
 
+open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
+partial def delabMorph : DelabM (TSyntaxArray `ident) := do
+  let e ← getExpr
+  match_expr e with
+  | ToTType.unitFinal _ => pure #[]
+  | ToTType.pair _ _ _ _ _ =>
+    let pre ← withAppFn <| withAppArg delabArgs
+    let me ← withAppArg <| annAsTerm <| ← `(ident|x)
+    return pre.push me
+  | _ => failure
 
 open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
 partial def delabStmtInner : DelabM (TSyntax `stmt) := do
@@ -1202,7 +1219,10 @@ partial def delabStmtInner : DelabM (TSyntax `stmt) := do
     | ToTType.PredSubst _ _ _ _ =>
       let pred ← withAppFn <| withAppArg delab
       let args ← withAppArg delabArgs
+
       `(stmt| [$pred] $args*)
+    | ToTType.PredWeak _ _ _ =>
+      withAppArg delabStmtInner
     | _ =>
       `(stmt| [$(← delab)])
   annAsTerm stx
@@ -1240,12 +1260,14 @@ partial def delabProof : Delab := do
   | _ => failure
 
 open Lean PrettyPrinter Delaborator SubExpr Parenthesizer in
-@[delab app.ToTType.Impl, delab app.ToTType.Forall]
+@[delab app.ToTType.Impl, delab app.ToTType.Forall, delab app.ToTType.PredSubst, delab app.ToTType.PredWeak]
 partial def delabStmt : Delab := do
   -- This delaborator only understands a certain arity - give up if it's incorrect
   guard <| match_expr ← getExpr with
     | ToTType.Impl _ _ _ => true
     | ToTType.Forall _ _ _ => true
+    | ToTType.PredSubst _ _ _ _=> true
+    | ToTType.PredWeak _ _ _ => true
     | _ => false
   match ← delabStmtInner with
   | `(stmt|[$e]) => pure e
@@ -1253,15 +1275,23 @@ partial def delabStmt : Delab := do
 
 theorem ToTType.liftOk (φ : A → Prop) : Proof (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
 
+macro_rules
+| `(tactic|intro) =>
+  `(tactic|apply ImplIntro)
 
 theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [AsToTPred' φ] x) → (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
-  sorry
+  intro
+
+
+
+
+
 
 theorem ToTType.liftOk'AfterIntro (φ : A → Prop) :
     Proof (Γ := ToTType.PCompr (Γ := Unit) ![(∀ x : A, [AsToTPred' φ] x)]) ![ (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   skip
 
--- TODO next time: we just finished part of the proof state delaborator; next step is to implement the intro tactic in the below.
+-- TODO next time: we just finished intro tactic for implication, next time do it for universal quantification
 
 /-
   Sketch proof using tactics:
