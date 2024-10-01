@@ -1368,7 +1368,7 @@ theorem ToTType.liftOk'AfterIntro (φ : A → Prop) :
     Proof (Γ := ToTType.PCompr (Γ := Unit) ![(∀ x : A, [AsToTPred' φ] x)]) ![ (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   skip
 
--- TODO next time: we just finished intro tactic for implication, next time do it for universal quantification
+-- TODO next time: we just finished intro tactic for implication, next time do it for universal quantification. Current progress: weakening is getting in the way. We think we need PredWeakForall above, but didn't finish it.
 
 /-
   Sketch proof using tactics:
