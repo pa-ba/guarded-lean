@@ -1283,10 +1283,6 @@ theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [A
   intro
 
 
-
-
-
-
 theorem ToTType.liftOk'AfterIntro (φ : A → Prop) :
     Proof (Γ := ToTType.PCompr (Γ := Unit) ![(∀ x : A, [AsToTPred' φ] x)]) ![ (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   skip
