@@ -55,6 +55,7 @@ def LThelp (n m : Nat) (h : m ≤ n) : {k : Nat // m+k = n} where
      -- Found using apply?
      -- by omega tactic
 
+@[simp]
 def LThelpZero (m n : Nat) (p : m+1=n) (q : m+1 ≤ n) : (LThelp n (m+1) q).val = 0
   := by
       have : n-(m+1) = 0 := by omega
@@ -885,22 +886,55 @@ def ToTType.comprOverProd : Prod (PCompr (Γ := Γ) φ) Δ ⤳ PCompr (Γ := (Pr
 
 def isConst (f : α → β) := ∃ (y : β), ∀ (x : α), f x = y
 
-theorem ToTType.restrmap_const_id (A : ToTType) (c : isConst A.F) : (∀ n x, HEq (A.restr n x) x) → (x : A.F m) → HEq (restrmap (m := n) (A := A) p x) x := by
+def isConst' (f : α → β) := ∀ x y, f x = f y
+
+
+
+@[simp]
+theorem ToTType.cast_eq : HEq (cast h a) a := by
+  cases h
+  simp [cast]
+
+
+theorem eq_rec_trans (x : γ) (p1 : α = β) (p2 : β = γ) : p1 ▸ p2 ▸ x = (p1.trans p2) ▸ x := by
+  cases p1
+  simp
+
+theorem ToTType.restrmaphelp_const {A : ToTType} (c : isConst' A.F) (a : A.F (n + k)) :
+    (∀ n x, A.restr n x = (c _ _).mp x) → restrmaphelp n k a = (c _ _).mp a := by
   intro constRestr
-  let ⟨B, allB⟩ := c
+  induction k generalizing n with
+  | zero =>
+    have := restrmaphelpzero n 0 rfl rfl a
+    simp only [Nat.add_zero, cast_refl_id] at this; trivial
+  | succ k' ih =>
+    have := restrmaphelpsucc n (k' + 1) rfl (by omega) a
+    rw [this]
+    have h : n + (k' + 1) = n + 1 + k' := by omega
+    have := constRestr n (restrmaphelp (n + 1) k' (cast h a))
+    simp_all only; clear this
+    simp [Eq.mp]
+    rw [eq_rec_trans] <;> try (apply c)
+    have : A.F (n + (k' + 1)) = A.F (n + 1 + k') := by apply c
+    congr 1
+    . apply c
+    . rw [h]
+    . apply cast_eq
+    . rw [h]
+
+
+
+theorem ToTType.restrmap_const_id (A : ToTType) (c : isConst' A.F) :
+    (∀ n x, A.restr n x = (c _ _).mp x) → (x : A.F m) →
+    restrmap (m := n) (A := A) p x = (c _ _) ▸ x := by
+  intro constRestr
   intros
-  simp [restrmap, LThelp, restrmaphelp]
-  sorry
-
-
-theorem ToTType.restrmap_const_id' (A : Type) : HEq (restrmap (m := n) (A := A) p x) x := by
-  intro constRestr
-  sorry
-
-
-
-
-
+  simp [restrmap]
+  rw [restrmaphelp_const] <;> try trivial
+  congr 1
+  . apply c
+  . exact heq_of_eqRec_eq (congrFun (congrArg Eq (c (n + (LThelp m n p).val) m)) (A.F n)) rfl
+  . exact cast_eq
 
 
 def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
@@ -914,6 +948,24 @@ def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
     simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h
     have := h n γ m m_le_n δ
     simp [PComprPr, comprOverProd] at this
+    rw [restrmap_const_id] at this
+    . rw [restrmap_const_id]
+      . sorry
+      . intro a b
+        dsimp
+        -- Also here
+      . sorry
+    . intro a b
+      dsimp
+      -- Stuck here because we'd need that Γ.F is constant
+
+    . sorry
+
+
+
+
+
+
 
 
 
@@ -1323,7 +1375,6 @@ partial def delabStmt : Delab := do
   | `(stmt|[$e]) => pure e
   | e => `(term|![$(⟨e⟩)])
 
-theorem ToTType.liftOk (φ : A → Prop) : Proof (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
 
 namespace Internals
 scoped syntax "builtinIntro" : tactic
@@ -1338,6 +1389,9 @@ macro_rules (kind := ourIntro)
   | `(tactic|intro) =>
     `(tactic|first | apply ImplIntro | apply ForallIntro | builtinIntro)
 
+
+
+theorem ToTType.liftOk (φ : A → Prop) : Proof (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
 
 theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [AsToTPred' φ] x) → (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   intro
