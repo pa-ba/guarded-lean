@@ -175,7 +175,6 @@ you can disable implicit lambdas using `@` or writing a lambda expression with `
         sorry
 
 
-
 def ToTHom (A B : ToTType) : Type
     := {f : (n : Nat) → A.F (n) → B.F (n) // (∀n x, B.restr n (f (n+1) x) = f n (A.restr n x))}
 
@@ -448,6 +447,10 @@ def fixpoint (A : ToTType) (f : (▷A) ⤳ A) : (Unit ⤳ A)
      fixp g
 
 -- Show fixpoint is fixed point
+
+def ToTType.restrmap_nat (f : Γ ⤳ Δ) (n m : Nat) (p : m ≤ n)(γ : Γ.F n) : f.val m (restrmap p γ) = restrmap p (f.val n γ) :=
+ by sorry
+
 
 def ToTType.StrF (A : Type) : Nat → Type
   | 0 => A × Unit
@@ -974,23 +977,36 @@ def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
     intro n γ
     simp [PredWeak, PredSubst, Forall, PComprPr]
     intro m m_le_n δ
+    have r := restrmap_nat (PComprPr φ) n m m_le_n γ
+    simp [PComprPr] at r
     -- Rasmus: Try
 --    let h_applied := h m (restrmap m_le_n γ) m (by omega) δ
     simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h -- h_applied
     have := h n γ m m_le_n δ
     simp [PComprPr, comprOverProd] at this
-    rw [restrmap_const_id] at this
-    . rw [restrmap_const_id]
-      . sorry
-      . intro a b
-        dsimp
+    rw[r] at this
+    exact this
+--    rw [restrmap_const_id] at this
+--    . rw [restrmap_const_id]
+--      . sorry
+--      . intro a b
+--        dsimp
         -- Also here
-      . sorry
-    . intro a b
-      dsimp
+--      . sorry
+--    . intro a b
+--      dsimp
       -- Stuck here because we'd need that Γ.F is constant
-
-    . sorry
+  . intro p
+    simp[Proof, Forall, PredSubst, PredWeak,PComprPr, comprOverProd]
+    intro n γ m m_le_n δ
+    simp[Proof, Forall, PredSubst, PredWeak,PComprPr, comprOverProd] at p
+    let r := p n γ m m_le_n δ
+    simp[Prod,PCompr]
+    let s := restrmap_nat (PComprPr φ) n m m_le_n γ
+    simp[PComprPr] at s
+    rw[s]
+    exact r
+    -- . sorry
 
 
 
