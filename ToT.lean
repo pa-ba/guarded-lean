@@ -740,7 +740,9 @@ def ToTType.ToTPred (Γ : ToTType) : Type
 
 def ToTType.AsToTPred (φ : A → Prop) : ToTPred A where
   val := φ
-  property := by sorry
+  property := by
+    intro n γ
+    simp
 
 
 
@@ -769,7 +771,10 @@ def ToTType.PCompr (φ : ToTPred Γ) : ToTType where
 
 def ToTType.PComprPr (φ : ToTPred Γ) : (PCompr φ) ⤳ Γ where
   val := fun n γp => γp.val
-  property := by sorry
+  property := by
+    simp
+    intro n x
+    simp[PCompr]
 
 /-- Weakening by a predicate-/
 def ToTType.PredWeak (φ ψ : ToTPred Γ) : ToTPred (ToTType.PCompr φ)  := ToTType.PredSubst ψ (PComprPr φ)
@@ -782,7 +787,11 @@ def ToTType.Proof (φ : ToTPred Γ) : Prop :=
 
 
 def ToTType.AsToTProof (p : ∀ x, φ x) : Proof (AsToTPred φ) :=
-  by sorry
+  by
+    simp[Proof]
+    intro n γ
+    simp[AsToTPred]
+    exact p γ
 
 
 -- The next one reintroduces sequents under different name
@@ -828,7 +837,13 @@ def ToTType.ConjElimR (p : Proof (Conj φ ψ)) : Proof ψ :=
 
 def ToTType.Impl (φ ψ : ToTPred Γ) : ToTPred Γ where
  val {n} γ := ∀ m, (p : m ≤ n) → φ.val (restrmap p γ) → ψ.val (restrmap p γ)
- property := by sorry
+ property := by
+   intro n γ q m p r
+   have s := restrmapEqInner (m:=m) (n:= n) (by omega) p γ
+   rw[← s] at r
+   have t := q m (by omega) r
+   rw[s] at t
+   exact t
 
 def ToTType.ImplIntro (p : Proof (Γ := PCompr φ) (PredWeak φ ψ)) : Proof (Impl φ ψ) :=
   by
@@ -871,20 +886,32 @@ def ToTType.Forall (φ : ToTPred (Prod Γ Δ)) : ToTPred Γ where
   val {n} γ := ∀ m, (p : m≤ n) → ∀ δ , φ.val ⟨ restrmap p γ , δ ⟩
   property := by
     intro n γ
-    sorry
+    simp
+    intro q
+    intro m p δ
+    have r := q m (by omega) δ
+    have s := restrmapEqInner (m:=m) (n:= n) (by omega) p γ
+    rw[s] at r
+    exact r
 
 
 def ToTType.prodOverCompr : PCompr (Γ := (Prod Γ Δ)) (PredSubst φ fst) ⤳ Prod (PCompr (Γ := Γ) φ) Δ where
   val n γ' :=
     let ⟨(γ, δ), p⟩ := γ'
     (⟨γ, p⟩, δ)
-  property := sorry
+  property := by
+    intro n x
+    let ⟨(γ, δ), p⟩ := x
+    simp[PCompr, PredSubst,Prod]
 
 def ToTType.comprOverProd : Prod (PCompr (Γ := Γ) φ) Δ ⤳ PCompr (Γ := (Prod Γ Δ)) (PredSubst φ fst) where
   val n γ' :=
     let ⟨⟨γ, p⟩, δ⟩ := γ'
     ⟨(γ, δ), p⟩
-  property := sorry
+  property := by
+    intro n x
+    let ⟨⟨γ, p⟩, δ⟩ := x
+    simp[PCompr, PredSubst,Prod]
 
 def isConst (f : α → β) := ∃ (y : β), ∀ (x : α), f x = y
 
@@ -947,8 +974,9 @@ def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
     intro n γ
     simp [PredWeak, PredSubst, Forall, PComprPr]
     intro m m_le_n δ
-    simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h
-    -- Rasmus: Try have := h m (restrmap m_le_n γ.val) m _ δ
+    -- Rasmus: Try
+--    let h_applied := h m (restrmap m_le_n γ) m (by omega) δ
+    simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h -- h_applied
     have := h n γ m m_le_n δ
     simp [PComprPr, comprOverProd] at this
     rw [restrmap_const_id] at this
