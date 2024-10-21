@@ -875,7 +875,9 @@ def ToTType.Forall (φ : ToTPred (Prod Γ Δ)) : ToTPred Γ where
 
 
 def ToTType.prodOverCompr : PCompr (Γ := (Prod Γ Δ)) (PredSubst φ fst) ⤳ Prod (PCompr (Γ := Γ) φ) Δ where
-  val := sorry
+  val n γ' :=
+    let ⟨(γ, δ), p⟩ := γ'
+    (⟨γ, p⟩, δ)
   property := sorry
 
 def ToTType.comprOverProd : Prod (PCompr (Γ := Γ) φ) Δ ⤳ PCompr (Γ := (Prod Γ Δ)) (PredSubst φ fst) where
@@ -946,6 +948,7 @@ def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
     simp [PredWeak, PredSubst, Forall, PComprPr]
     intro m m_le_n δ
     simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h
+    -- Rasmus: Try have := h m (restrmap m_le_n γ.val) m _ δ
     have := h n γ m m_le_n δ
     simp [PComprPr, comprOverProd] at this
     rw [restrmap_const_id] at this
