@@ -784,12 +784,12 @@ def ToTType.PredWeak (φ ψ : ToTPred Γ) : ToTPred (ToTType.PCompr φ)  := ToTT
 
 
 
-def ToTType.Proof (φ : ToTPred Γ) : Prop :=
+def ToTType.Proof (Γ : ToTType) (φ : ToTPred Γ) : Prop :=
   ∀ n (γ : Γ.F n), φ.val γ
 
 
 
-def ToTType.AsToTProof (p : ∀ x, φ x) : Proof (AsToTPred φ) :=
+def ToTType.AsToTProof (p : ∀ x, φ x) : Proof _ (AsToTPred φ) :=
   by
     simp[Proof]
     intro n γ
@@ -799,7 +799,7 @@ def ToTType.AsToTProof (p : ∀ x, φ x) : Proof (AsToTPred φ) :=
 
 -- The next one reintroduces sequents under different name
 def ToTType.ProofImpl (φ ψ : ToTPred Γ) : Prop :=
-  Proof (PredWeak φ ψ)
+  Proof _ (PredWeak φ ψ)
 
 -- Forget about sequents, use Proof
 /--
@@ -829,13 +829,13 @@ def ToTType.Conj (φ ψ : ToTPred Γ) : ToTPred Γ where
     . exact φ.property n γ p
     . exact ψ.property n γ q
 
-def ToTType.ConjIntro (p : Proof φ) (q : Proof ψ) : Proof (Conj φ ψ) :=
+def ToTType.ConjIntro (p : Proof _ φ) (q : Proof _ ψ) : Proof _ (Conj φ ψ) :=
   by sorry
 
-def ToTType.ConjElimL (p : Proof (Conj φ ψ)) : Proof φ :=
+def ToTType.ConjElimL (p : Proof _ (Conj φ ψ)) : Proof _ φ :=
   by sorry
 
-def ToTType.ConjElimR (p : Proof (Conj φ ψ)) : Proof ψ :=
+def ToTType.ConjElimR (p : Proof _  (Conj φ ψ)) : Proof _  ψ :=
   by sorry
 
 def ToTType.Impl (φ ψ : ToTPred Γ) : ToTPred Γ where
@@ -848,7 +848,7 @@ def ToTType.Impl (φ ψ : ToTPred Γ) : ToTPred Γ where
    rw[s] at t
    exact t
 
-def ToTType.ImplIntro (p : Proof (Γ := PCompr φ) (PredWeak φ ψ)) : Proof (Impl φ ψ) :=
+def ToTType.ImplIntro (p : Proof  (Γ := PCompr φ) (PredWeak φ ψ)) : Proof _  (Impl φ ψ) :=
   by
    simp_all[Proof]
    intro n γ
@@ -970,32 +970,9 @@ theorem ToTType.restrmap_const_id (A : ToTType) (c : isConst' A.F) :
 
 
 def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
-    Proof (Forall (PredSubst (PredWeak (PredSubst φ fst) ψ) comprOverProd)) ↔ Proof (PredWeak φ (Forall ψ))
+    Proof _  (PredWeak φ (Forall ψ)) ↔ Proof _  (Forall (PredSubst (PredWeak (PredSubst φ fst) ψ) comprOverProd))
   := by
   constructor
-  . intro h
-    intro n γ
-    simp [PredWeak, PredSubst, Forall, PComprPr]
-    intro m m_le_n δ
-    have r := restrmap_nat (PComprPr φ) n m m_le_n γ
-    simp [PComprPr] at r
-    -- Rasmus: Try
---    let h_applied := h m (restrmap m_le_n γ) m (by omega) δ
-    simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h -- h_applied
-    have := h n γ m m_le_n δ
-    simp [PComprPr, comprOverProd] at this
-    rw[r] at this
-    exact this
---    rw [restrmap_const_id] at this
---    . rw [restrmap_const_id]
---      . sorry
---      . intro a b
---        dsimp
-        -- Also here
---      . sorry
---    . intro a b
---      dsimp
-      -- Stuck here because we'd need that Γ.F is constant
   . intro p
     simp[Proof, Forall, PredSubst, PredWeak,PComprPr, comprOverProd]
     intro n γ m m_le_n δ
@@ -1006,9 +983,17 @@ def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
     simp[PComprPr] at s
     rw[s]
     exact r
-    -- . sorry
-
-
+  . intro h
+    intro n γ
+    simp [PredWeak, PredSubst, Forall, PComprPr]
+    intro m m_le_n δ
+    have r := restrmap_nat (PComprPr φ) n m m_le_n γ
+    simp [PComprPr] at r
+    simp [PCompr, Proof, PredSubst, Forall, PredWeak] at γ h
+    have := h n γ m m_le_n δ
+    simp [PComprPr, comprOverProd] at this
+    rw[r] at this
+    exact this
 
 
 
@@ -1022,16 +1007,16 @@ def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
 def ToTType.ForallCl (φ : ToTPred Γ) : ToTPred Unit :=
   Forall (PredSubst φ snd)
 
-def ToTType.ForallIntro {φ : ToTPred (Prod Γ A)} (p : Proof φ) : Proof (Γ := Γ) (Forall φ) :=
+def ToTType.ForallIntro {φ : ToTPred (Prod Γ A)} (p : Proof _  φ) : Proof (Γ := Γ) (Forall φ) :=
   by sorry
 
-def ToTType.ForallIntroCl (p : Proof φ) : Proof (ForallCl φ) :=
+def ToTType.ForallIntroCl (p : Proof _  φ) : Proof _  (ForallCl φ) :=
   by sorry
 
-def ToTType.ForallElim {φ : ToTPred (Prod Γ Δ)} (p : Proof (Forall φ)) : Proof φ :=
+def ToTType.ForallElim {φ : ToTPred (Prod Γ Δ)} (p : Proof _  (Forall φ)) : Proof _  φ :=
   by sorry
 
-def ToTType.ForallElimCl (p : Proof (ForallCl φ)) : Proof φ :=
+def ToTType.ForallElimCl (p : Proof _  (ForallCl φ)) : Proof _  φ :=
   by sorry
 
 /--
@@ -1058,7 +1043,7 @@ def ToTType.True (Γ : ToTType) : ToTPred Γ where
     intro n _
     simp
 
-def ToTType.Top {Γ : ToTType} : Proof (True Γ) :=
+def ToTType.Top {Γ : ToTType} : Proof _  (True Γ) :=
   by
     simp[Proof]
     intro n γ
@@ -1175,7 +1160,7 @@ def ToTType.PEarlier (φ : ToTPred Γ) : ToTPred (◁ Γ) where
 
 
 -- def ToTType.Pfix (p : Sequent (Conj φ (PredSubst (PLater ψ) ToTType.next)) ψ) : Sequent φ ψ  :=
-def ToTType.Pfix {φ : ToTPred Γ} (p : Proof (PredSubst φ (PComprPr (PLaterFib φ))))  : Proof φ  :=
+def ToTType.Pfix (φ : ToTPred Γ) (p : Proof _ (PredWeak (PLaterFib φ) φ)) : Proof _  φ  :=
   by
     sorry
 
@@ -1202,7 +1187,7 @@ def ToTType.PredLiftStr {A : Type} (ψ : A → Prop) : ToTPred (ToTType.Str A) :
   PropElem g
 
 -- def ToTType.PredLiftStrFold : Sequent (Conj (PredSubst φ hd) (PredSubst (PLater (PredLiftStr φ)) Str.tail)) (PredLiftStr φ) :=
-  def ToTType.PredLiftStrFold (p : Proof (PredSubst (AsToTPred φ) hd)) (q : Proof (PredSubst (PLater (PredLiftStr φ)) Str.tail)) : Proof (PredLiftStr φ) :=
+  def ToTType.PredLiftStrFold (p : Proof _  (PredSubst (AsToTPred φ) hd)) (q : Proof _  (PredSubst (PLater (PredLiftStr φ)) Str.tail)) : Proof _  (PredLiftStr φ) :=
     by sorry
 
 def ToTType.PredLiftStrHelp {φ : A → Prop} (p : forall a, φ a)
@@ -1218,14 +1203,16 @@ def ToTType.PredLiftStrHelp {φ : A → Prop} (p : forall a, φ a)
 
 
 
-def ToTType.PredLiftStrProof (p : Proof φ) : Proof (ForallCl (PredLiftStr φ)) :=
+def ToTType.PredLiftStrProof (p : Proof _  φ) : Proof _  (ForallCl (PredLiftStr φ)) :=
   ForallIntroCl (Pfix _)
 
 -- Add tail condition to the below
 def ToTType.PredLiftStrPretty  {A : Type} : Box (((A : ToTType).Fun ToTProp).Fun ((ToTType.Str A).Fun ToTProp)) :=
   box(fun (φ : _) => fix (ψ : ((Str A).Fun ToTProp)) => fun (xs : _)  => φ (head(xs)))
 
-axiom LiftPredStr {A} : (φ : A → Prop) → ToTType.ToTPred (ToTType.Prod Unit (ToTType.Str A))
+axiom LiftPredStr {Γ} {A} : (φ : A → Prop) → ToTType.ToTPred (ToTType.Prod Γ (ToTType.Str A))
+
+axiom ToTType.LiftPredStrWeak {Γ} {A} {φ} : Proof (Prod Γ (ToTType.Str A)) (LiftPredStr φ)  → Proof _ (PredWeak (LiftPredStr φ) _)
 
 declare_syntax_cat ctxt
 declare_syntax_cat ctxt_elem
@@ -1438,14 +1425,16 @@ macro_rules (kind := ourIntro)
 
 
 
-theorem ToTType.liftOk (φ : A → Prop) : Proof (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
+theorem ToTType.liftOk (φ : A → Prop) : Proof _ (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
 
 theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [AsToTPred' φ] x) → (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   intro
-  conv =>
-    arg 1
-    apply prodOverCompr
+  rw [PredWeakForall]
+  apply Pfix
+  rw [PredWeakForall]
   apply ForallIntro
+  sorry
+
 
 -- @Proof ?Γ (![∀ x✝, [?φ] ]) : Prop
 
@@ -1486,7 +1475,7 @@ theorem ToTType.liftOk'AfterIntro (φ : A → Prop) :
          IH : ▷ (∀ xs, LiftPredStr φ xs)
      intro xs
      [Something to unfold LiftPredStr φ xs]
-     cases (not sure what the tactic name is, need to prove conjunction)
+    constructor/conjIntro  (not sure what the tactic name is, need to prove conjunction)
      . apply p
      . tickintro
          At this point context is
