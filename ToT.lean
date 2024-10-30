@@ -768,11 +768,11 @@ def ToTType.AsToTPred' (φ : A → Prop) : ToTPred (Prod Unit A) :=
 
 
 
-def ToTType.PCompr (φ : ToTPred Γ) : ToTType where
+def ToTType.PCompr (Γ : ToTType) (φ : ToTPred Γ) : ToTType where
   F n := {γ : Γ.F n // φ.val γ}
   restr n γp := ⟨ Γ.restr n γp.val , φ.property n γp.val γp.property ⟩
 
-def ToTType.PComprPr (φ : ToTPred Γ) : (PCompr φ) ⤳ Γ where
+def ToTType.PComprPr (φ : ToTPred Γ) : (PCompr Γ φ) ⤳ Γ where
   val := fun n γp => γp.val
   property := by
     simp
@@ -780,8 +780,10 @@ def ToTType.PComprPr (φ : ToTPred Γ) : (PCompr φ) ⤳ Γ where
     simp[PCompr]
 
 /-- Weakening by a predicate-/
-def ToTType.PredWeak (φ ψ : ToTPred Γ) : ToTPred (ToTType.PCompr φ)  := ToTType.PredSubst ψ (PComprPr φ)
+def ToTType.PredWeak (φ ψ : ToTPred Γ) : ToTPred (ToTType.PCompr Γ φ)  := ToTType.PredSubst ψ (PComprPr φ)
 
+def ToTType.TypeWeak (φ : ToTPred Γ) : ToTPred (Prod Γ A) :=
+  ToTType.PredSubst φ fst
 
 
 def ToTType.Proof (Γ : ToTType) (φ : ToTPred Γ) : Prop :=
@@ -848,7 +850,7 @@ def ToTType.Impl (φ ψ : ToTPred Γ) : ToTPred Γ where
    rw[s] at t
    exact t
 
-def ToTType.ImplIntro (p : Proof  (Γ := PCompr φ) (PredWeak φ ψ)) : Proof _  (Impl φ ψ) :=
+def ToTType.ImplIntro (p : Proof  (Γ := PCompr Γ φ) (PredWeak φ ψ)) : Proof _  (Impl φ ψ) :=
   by
    simp_all[Proof]
    intro n γ
@@ -1160,7 +1162,7 @@ def ToTType.PEarlier (φ : ToTPred Γ) : ToTPred (◁ Γ) where
 
 
 -- def ToTType.Pfix (p : Sequent (Conj φ (PredSubst (PLater ψ) ToTType.next)) ψ) : Sequent φ ψ  :=
-def ToTType.Pfix (φ : ToTPred Γ) (p : Proof _ (PredWeak (PLaterFib φ) φ)) : Proof _  φ  :=
+def ToTType.Pfix (φ : ToTPred Γ) (p : Proof (PCompr (Γ := Γ) (PLaterFib φ)) (PredWeak (PLaterFib φ) φ)) : Proof Γ φ  :=
   by
     sorry
 
@@ -1210,9 +1212,21 @@ def ToTType.PredLiftStrProof (p : Proof _  φ) : Proof _  (ForallCl (PredLiftStr
 def ToTType.PredLiftStrPretty  {A : Type} : Box (((A : ToTType).Fun ToTProp).Fun ((ToTType.Str A).Fun ToTProp)) :=
   box(fun (φ : _) => fix (ψ : ((Str A).Fun ToTProp)) => fun (xs : _)  => φ (head(xs)))
 
-axiom LiftPredStr {Γ} {A} : (φ : A → Prop) → ToTType.ToTPred (ToTType.Prod Γ (ToTType.Str A))
+-- axiom LiftPredStr {Γ} {A} : (φ : A → Prop) → ToTType.ToTPred (ToTType.Prod Γ (ToTType.Str A))
 
-axiom ToTType.LiftPredStrWeak {Γ} {A} {φ} : Proof (Prod Γ (ToTType.Str A)) (LiftPredStr φ)  → Proof _ (PredWeak (LiftPredStr φ) _)
+axiom LiftPredStr {A} : (φ : A → Prop) → ToTType.ToTPred (ToTType.Prod Unit (ToTType.Str A))
+
+axiom ToTType.LiftPredStrCompOverProd {Γ} {A} {φ : A → Prop} {ψ : ToTPred Γ} : Proof (Prod (PCompr Γ ψ) (Str A)) (PredSubst (LiftPredStr φ) (pair unitFinal snd)) ↔
+   Proof (Prod (PCompr Γ ψ) (Str A)) (PredSubst (PredWeak (TypeWeak ψ) (PredSubst (LiftPredStr φ) (pair unitFinal snd))) comprOverProd)
+
+-- axiom ToTType.LiftPredStrWeak {Γ} {A} {φ : A → Prop} {ψ : ToTPred Γ} : Proof (Prod (PCompr (Γ := Γ) ψ) (ToTType.Str A)) (LiftPredStr φ)
+--    → Proof (PCompr (Γ := Prod Γ (Str A)) (TypeWeak ψ)) (PredWeak (TypeWeak ψ) (LiftPredStr (Γ := Γ) φ))
+
+-- axiom ToTType.LiftPredStrCompOverProd {Γ} {A} {φ : A → Prop} {ψ : ToTPred Γ} : Proof (Prod (PCompr Γ ψ) (Str A)) (LiftPredStr φ) ↔
+--   Proof (Prod (PCompr Γ ψ) (Str A)) (PredSubst (PredWeak (TypeWeak ψ) (LiftPredStr φ)) comprOverProd)
+
+-- axiom ToTType.LiftPredSubst {Γ Δ : ToTType} {σ : Δ ⤳ Γ} {A} {φ : A → Prop} :
+--  Proof (Prod Δ (Str A)) (PredSubst (LiftPredStr (Γ := Γ) φ) (ProdHom σ ToTType.id)) ↔ Proof (Prod Δ (Str A)) (LiftPredStr (Γ := Δ) φ)
 
 declare_syntax_cat ctxt
 declare_syntax_cat ctxt_elem
@@ -1425,7 +1439,7 @@ macro_rules (kind := ourIntro)
 
 
 
-theorem ToTType.liftOk (φ : A → Prop) : Proof _ (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
+-- theorem ToTType.liftOk (φ : A → Prop) : Proof _ (Impl (ForallCl (AsToTPred φ)) (ForallCl (LiftPredStr φ))) := sorry
 
 theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [AsToTPred' φ] x) → (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   intro
@@ -1433,8 +1447,17 @@ theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [A
   apply Pfix
   rw [PredWeakForall]
   apply ForallIntro
+  simp
+  have := @LiftPredStrCompOverProd Unit A φ
+  rw [← LiftPredStrCompOverProd]
+  -- Stuck here
+  apply LiftPredStrWeak
   sorry
 
+-- Todo (30 Oct, 2024): LiftPredStr and AsToTPred' work on singular contexts at the moment, but should instead take a context projection
+-- as argument. Then we can push weakenings and substitutions inward in these context projections instead of accumulating them
+-- on the outside of the term. All stuff we tried to get rid of using LiftPredStrCompOverProd should not disappear but be moved
+-- inward in term. Having a kind of projection normal form will also make it easier to display real variable names to the user.
 
 -- @Proof ?Γ (![∀ x✝, [?φ] ]) : Prop
 
