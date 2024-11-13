@@ -998,6 +998,9 @@ def ToTType.PredWeakForall {φ : ToTPred Γ} {ψ : ToTPred (Γ.Prod A)} :
     exact this
 
 
+def ToTType.PredSubstForall {σ : Δ ⤳ Γ} {ψ : ToTPred (Γ.Prod A)} :
+    Proof Δ (PredSubst (Forall ψ) σ) ↔ Proof Δ  (Forall (PredSubst ψ (pair (comp fst σ) snd))) := sorry
+
 
 
 
@@ -1217,19 +1220,12 @@ def ToTType.PredLiftStrPretty  {A : Type} : Box (((A : ToTType).Fun ToTProp).Fun
 axiom LiftPredStr {A} {Γ} : (φ : A → Prop) → (π : Γ ⤳ ToTType.Str A) → ToTType.ToTPred Γ
 
 axiom ToTType.PredSubstIntoLiftPredStr {A} {Γ} {Δ} : (φ : A → Prop) → (π : Γ ⤳ ToTType.Str A) → (σ : Δ ⤳ Γ) → (PredSubst (LiftPredStr φ π) σ) = LiftPredStr φ (comp σ π)
--- Use of equality is justified by Prop-ext and fun-ext from the def of ToTPred
 
--- axiom ToTType.LiftPredStrCompOverProd {Γ} {A} {φ : A → Prop} {ψ : ToTPred Γ} : Proof (Prod (PCompr Γ ψ) (Str A)) (PredSubst (LiftPredStr φ) (pair unitFinal snd)) ↔
---   Proof (Prod (PCompr Γ ψ) (Str A)) (PredSubst (PredWeak (TypeWeak ψ) (PredSubst (LiftPredStr φ) (pair unitFinal snd))) comprOverProd)
-
--- axiom ToTType.LiftPredStrWeak {Γ} {A} {φ : A → Prop} {ψ : ToTPred Γ} : Proof (Prod (PCompr (Γ := Γ) ψ) (ToTType.Str A)) (LiftPredStr φ)
---    → Proof (PCompr (Γ := Prod Γ (Str A)) (TypeWeak ψ)) (PredWeak (TypeWeak ψ) (LiftPredStr (Γ := Γ) φ))
-
--- axiom ToTType.LiftPredStrCompOverProd {Γ} {A} {φ : A → Prop} {ψ : ToTPred Γ} : Proof (Prod (PCompr Γ ψ) (Str A)) (LiftPredStr φ) ↔
---   Proof (Prod (PCompr Γ ψ) (Str A)) (PredSubst (PredWeak (TypeWeak ψ) (LiftPredStr φ)) comprOverProd)
-
--- axiom ToTType.LiftPredSubst {Γ Δ : ToTType} {σ : Δ ⤳ Γ} {A} {φ : A → Prop} :
---  Proof (Prod Δ (Str A)) (PredSubst (LiftPredStr (Γ := Γ) φ) (ProdHom σ ToTType.id)) ↔ Proof (Prod Δ (Str A)) (LiftPredStr (Γ := Δ) φ)
+axiom ToTType.LiftPredStrIntro {A} {Γ} {φ : A → Prop} {π : Γ ⤳ ToTType.Str A} :
+  Proof _ (PredSubst (AsToTPred φ) (comp π Str.head)) →
+  -- What is second argument? Later of tail?
+  Proof _ (LiftPredStr φ (comp π)) →
+  Proof _ (LiftPredStr φ π)
 
 declare_syntax_cat ctxt
 declare_syntax_cat ctxt_elem
@@ -1462,17 +1458,12 @@ macro_rules (kind := ourIntro)
 
 theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [AsToTPred' φ] x) → (∀ xs : Str A, [LiftPredStr φ] xs) ] := by
   intro
-  rw [PredWeakForall]
-  set_option pp.explicit true in
-  conv =>
-    congr
-    congr
-    -- Stuck here. Todo 5/11: move PredWeak under LiftPredStr
-    rw [PredSubstIntoLiftPredStr φ snd]
+  -- rw [PredWeakForall]
+  simp [PredWeakForall, PredWeak, PredSubstIntoLiftPredStr, PredSubstForall]
   apply Pfix
-  rw [PredWeakForall]
+  simp [PredWeakForall, PredWeak, PredSubstIntoLiftPredStr, PredSubstForall]
   apply ForallIntro
-  rw[PredSubstIntoLiftPredStr φ snd]
+  simp [PredWeakForall, PredWeak, PredSubstIntoLiftPredStr, PredSubstForall]
   simp
   have := @LiftPredStrCompOverProd Unit A φ
   rw [← LiftPredStrCompOverProd]
