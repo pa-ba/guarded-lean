@@ -766,8 +766,6 @@ def ToTType.PredSubst (φ : ToTPred Γ) (σ : Δ ⤳ Γ) : ToTPred Δ where
 def ToTType.AsToTPred' (φ : A → Prop) (π : Γ ⤳ A): ToTPred Γ :=
   PredSubst (AsToTPred φ) π
 
-
-
 def ToTType.PCompr (Γ : ToTType) (φ : ToTPred Γ) : ToTType where
   F n := {γ : Γ.F n // φ.val γ}
   restr n γp := ⟨ Γ.restr n γp.val , φ.property n γp.val γp.property ⟩
@@ -1018,11 +1016,21 @@ def ToTType.ForallIntro {φ : ToTPred (Prod Γ A)} (p : Proof _  φ) : Proof (Γ
 def ToTType.ForallIntroCl (p : Proof _  φ) : Proof _  (ForallCl φ) :=
   by sorry
 
-def ToTType.ForallElim {φ : ToTPred (Prod Γ Δ)} (p : Proof _  (Forall φ)) : Proof _  φ :=
+def ToTType.ForallElim {φ : ToTPred (Prod Γ Δ)} (p : Proof Γ (Forall φ)) : Proof (Prod Γ Δ)  φ :=
   by sorry
+
+def ToTType.ForallElimSubst {φ : ToTPred (Prod Γ Δ)} (p : Proof Γ (Forall φ)) (σ : Ξ ⤳ (Prod Γ Δ)) : Proof Ξ (PredSubst φ σ) := sorry
 
 def ToTType.ForallElimCl (p : Proof _  (ForallCl φ)) : Proof _  φ :=
   by sorry
+
+def Surjective (σ : Δ ⤳ Γ) : Prop := ∀ n (γ : Γ.F n) , ∃ δ , σ.val n δ = γ
+
+def ToTType.Decompose  (ψ : _) (p : Proof Δ ψ) (σ : Δ ⤳ Γ) (q : Surjective σ) (t : ψ = (PredSubst φ σ)): Proof Γ φ := by
+    intro n γ
+    have ⟨ δ , r ⟩ := q n γ
+    have s := p n δ
+    simp_all [PredSubst]
 
 /--
 def ToTType.ForallIntro (p : Sequent (PredSubst φ fst) ψ) : Sequent φ (Forall ψ) :=
@@ -1222,10 +1230,11 @@ axiom LiftPredStr {A} {Γ} : (φ : A → Prop) → (π : Γ ⤳ ToTType.Str A) �
 axiom ToTType.PredSubstIntoLiftPredStr {A} {Γ} {Δ} : (φ : A → Prop) → (π : Γ ⤳ ToTType.Str A) → (σ : Δ ⤳ Γ) → (PredSubst (LiftPredStr φ π) σ) = LiftPredStr φ (comp σ π)
 
 axiom ToTType.LiftPredStrIntro {A} {Γ} {φ : A → Prop} {π : Γ ⤳ ToTType.Str A} :
-  Proof _ (PredSubst (AsToTPred φ) (comp π Str.head)) →
+  (hdpf : Proof Γ (AsToTPred' φ (comp π Str.head))) →
   -- What is second argument? Later of tail?
-  Proof _ (LiftPredStr φ (comp π)) →
-  Proof _ (LiftPredStr φ π)
+  -- Proof _ (PredSubst (PLater (LiftPredStr φ id)) (comp π Str.tail)) →
+  (tlpf : Proof Γ (PLatBind (LiftPredStr φ (adv (comp π Str.tail))))) →
+  Proof Γ (LiftPredStr φ π)
 
 declare_syntax_cat ctxt
 declare_syntax_cat ctxt_elem
@@ -1463,12 +1472,14 @@ theorem ToTType.liftOk' (φ : A → Prop) : Proof (Γ := Unit) ![ (∀ x : A, [A
   apply Pfix
   simp [PredWeakForall, PredWeak, PredSubstIntoLiftPredStr, PredSubstForall]
   apply ForallIntro
-  simp [PredWeakForall, PredWeak, PredSubstIntoLiftPredStr, PredSubstForall]
-  simp
-  have := @LiftPredStrCompOverProd Unit A φ
-  rw [← LiftPredStrCompOverProd]
-  -- Stuck here
-  apply LiftPredStrWeak
+  apply LiftPredStrIntro
+  . simp [PredWeakForall, PredWeak, PredSubstIntoLiftPredStr, PredSubstForall]
+    apply Decompose (AsToTPred' φ snd)
+    case t => simp [AsToTPred', PredSubst]
+    .
+    -- apply ForallElim
+
+
   sorry
 
 -- @Proof ?Γ (![∀ x✝, [?φ] ]) : Prop
